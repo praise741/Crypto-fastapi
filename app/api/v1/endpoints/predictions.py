@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.api.v1.dependencies import get_db
+from app.core.responses import success_response
+from app.models.schemas.predictions import BatchPredictionRequest
+from app.services.prediction import (
+    get_batch_predictions,
+    get_prediction_history,
+    get_predictions,
+    get_model,
+    list_models,
+)
+
+router = APIRouter(prefix="/predictions", tags=["Predictions"])
+models_router = APIRouter(prefix="/models", tags=["Models"])
+
+
+@router.get("/{symbol}")
+def read_predictions(
+    symbol: str,
+    horizons: List[str] | None = Query(None),
+    include_confidence: bool = Query(True),
+    include_factors: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    response = get_predictions(
+        db,
+        symbol=symbol,
+        horizons=horizons,
+        include_confidence=include_confidence,
+        include_factors=include_factors,
+    )
+    return success_response(response.model_dump())
+
+
+@router.post("/batch")
+def batch_predictions(payload: BatchPredictionRequest, db: Session = Depends(get_db)):
+    responses = [item.model_dump() for item in get_batch_predictions(db, payload)]
+    return success_response({"predictions": responses})
+
+
+@router.get("/{symbol}/history")
+def prediction_history(
+    symbol: str,
+    start_date: datetime | None = Query(None),
+    end_date: datetime | None = Query(None),
+    include_accuracy: bool = Query(True),
+    db: Session = Depends(get_db),
+):
+    response = get_prediction_history(
+        db,
+        symbol=symbol,
+        start_date=start_date,
+        end_date=end_date,
+        include_accuracy=include_accuracy,
+    )
+    return success_response(response.model_dump())
+
+
+@models_router.get("")
+def list_model_metadata():
+    models = [
+        {
+            "model_id": model.model_id,
+            "version": model.version,
+            "symbol": model.symbol,
+            "type": model.model_type,
+            "metrics": model.metrics,
+            "features": model.features,
+            "last_updated": model.last_updated.isoformat(),
+        }
+        for model in list_models()
+    ]
+    return success_response({"models": models})
+
+
+@models_router.get("/{model_id}")
+def model_detail(model_id: str):
+    model = get_model(model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return success_response(
+        {
+            "model_id": model.model_id,
+            "version": model.version,
+            "symbol": model.symbol,
+            "type": model.model_type,
+            "metrics": model.metrics,
+            "features": model.features,
+            "last_updated": model.last_updated.isoformat(),
+        }
+    )
+
+
+@models_router.get("/{model_id}/metrics")
+def model_metrics(model_id: str):
+    model = get_model(model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return success_response({"model_id": model.model_id, "metrics": model.metrics})
