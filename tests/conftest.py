@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.v1.dependencies import get_db
+from app.api.v1.dependencies import get_current_active_user, get_db
 from app.core.database import Base
 import app.models.database  # noqa: F401
 from app.core.security import get_password_hash
@@ -38,6 +38,20 @@ def override_get_db() -> Session:
 
 
 app.dependency_overrides[get_db] = override_get_db
+
+
+def override_current_user():
+    with TestingSessionLocal() as session:
+        user = session.query(User).first()
+        if not user:
+            user = User(email="autouser@example.com", password_hash=get_password_hash("password123"))
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+        return user
+
+
+app.dependency_overrides[get_current_active_user] = override_current_user
 
 
 @pytest.fixture

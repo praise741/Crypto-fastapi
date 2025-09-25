@@ -81,11 +81,19 @@ def ohlcv(
 @router.get("/{symbol}/indicators")
 def indicators(
     symbol: str,
-    indicators: str = Query("rsi,macd", description="Comma separated list of indicators"),
+    indicator_set: str = Query(
+        "RSI,MACD,SMA,EMA,BOLL",
+        alias="set",
+        description="Comma separated list of indicators",
+    ),
     db: Session = Depends(get_db),
 ):
-    indicator_list: List[str] = [item.strip() for item in indicators.split(",") if item.strip()]
-    data = calculate_indicators(db, symbol, indicator_list)
+    allowed = {"rsi", "macd", "sma", "ema", "boll"}
+    requested = [item.strip().lower() for item in indicator_set.split(",") if item.strip()]
+    invalid = [item for item in requested if item not in allowed]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Unsupported indicators: {', '.join(invalid)}")
+    data = calculate_indicators(db, symbol, requested)
     return success_response(data.model_dump())
 
 

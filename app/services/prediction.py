@@ -28,6 +28,7 @@ HORIZON_TO_HOURS: Dict[str, int] = {
     "1h": 1,
     "4h": 4,
     "24h": 24,
+    "1d": 24,
     "7d": 24 * 7,
 }
 
@@ -372,6 +373,7 @@ def get_prediction_history(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     include_accuracy: bool = True,
+    limit: int | None = None,
 ) -> PredictionHistoryResponse:
     symbol = symbol.upper()
     query = db.query(Prediction).filter(Prediction.symbol == symbol)
@@ -379,7 +381,10 @@ def get_prediction_history(
         query = query.filter(Prediction.prediction_time >= start_date)
     if end_date:
         query = query.filter(Prediction.prediction_time <= end_date)
-    records = query.order_by(desc(Prediction.prediction_time)).all()
+    query = query.order_by(desc(Prediction.prediction_time))
+    if limit:
+        query = query.limit(limit)
+    records = query.all()
     items = [
         PredictionHistoryItem(
             prediction_time=record.prediction_time,
