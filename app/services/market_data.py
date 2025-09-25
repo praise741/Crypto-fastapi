@@ -22,7 +22,7 @@ from app.models.schemas.market import (
     Trade,
     DepthLevel,
 )
-from app.services.external import CoinGeckoClient, DexScreenerClient
+from app.services.external import BinanceClient, CoinGeckoClient, DexScreenerClient
 
 
 SYMBOL_DETAILS: Dict[str, Dict[str, str]] = {
@@ -65,6 +65,7 @@ coin_gecko_client = CoinGeckoClient(
     base_url=settings.COINGECKO_BASE_URL,
 )
 dex_screener_client = DexScreenerClient(base_url=settings.DEXSCREENER_BASE_URL)
+binance_client = BinanceClient(base_url=settings.BINANCE_BASE_URL)
 
 
 def _fallback_price(symbol: str) -> MarketPrice:
@@ -358,17 +359,19 @@ def _build_order_levels(price: float, liquidity_usd: float | None) -> List[Depth
 
 
 def get_order_book(symbol: str) -> OrderBook:
-    base_price = 0.0
+    payload = binance_client.fetch_depth(symbol, limit=50)
+    if payload and payload.get("bids") and payload.get("asks"):
+        bids = [DepthLevel(price=float(price), quantity=float(qty)) for price, qty in payload["bids"][:20]]
+        asks = [DepthLevel(price=float(price), quantity=float(qty)) for price, qty in payload["asks"][:20]]
+        return OrderBook(symbol=symbol.upper(), bids=bids, asks=asks, timestamp=datetime.utcnow())
+
+    base_price = 20000 + (hash(symbol) % 5000)
     liquidity = None
-    pair = None
     if settings.DEXSCREENER_ENABLED:
         pair = dex_screener_client.search_pair(symbol)
-    if pair and pair.price_usd:
-        base_price = pair.price_usd
-        liquidity = pair.liquidity_usd
-    if not base_price:
-        base_price = 20000 + (hash(symbol) % 5000)
-
+        if pair and pair.price_usd:
+            base_price = pair.price_usd
+            liquidity = pair.liquidity_usd
     bids = _build_order_levels(base_price, liquidity)
     asks = [DepthLevel(price=round(base_price + (base_price * 0.005 * (i + 1)), 2), quantity=level.quantity) for i, level in enumerate(bids)]
     return OrderBook(symbol=symbol.upper(), bids=bids, asks=asks, timestamp=datetime.utcnow())
@@ -376,6 +379,20 @@ def get_order_book(symbol: str) -> OrderBook:
 
 def get_recent_trades(symbol: str) -> List[Trade]:
     trades: List[Trade] = []
+    binance_trades = binance_client.fetch_trades(symbol, limit=50)
+    if binance_trades:
+        for idx, entry in enumerate(binance_trades):
+            trades.append(
+                Trade(
+                    trade_id=f"binance-{symbol}-{int(entry.timestamp.timestamp())}-{idx}",
+                    price=entry.price,
+                    quantity=entry.qty,
+                    side="sell" if entry.is_buyer_maker else "buy",
+                    timestamp=entry.timestamp,
+                )
+            )
+        return trades
+
     if settings.DEXSCREENER_ENABLED:
         pair = dex_screener_client.search_pair(symbol)
         if pair and pair.transactions:
@@ -387,7 +404,7 @@ def get_recent_trades(symbol: str) -> List[Trade]:
                     Trade(
                         trade_id=f"{pair.pair_address}-{window}",
                         price=float(pair.price_usd or 0.0),
-                        quantity=float(stats.get("volume", 0.0) or (buys + sells) or 0.0),
+                        quantity=float((buys + sells) or 0.0),
                         side="buy" if buys >= sells else "sell",
                         timestamp=now - timedelta(minutes=_window_to_minutes(window)),
                     )
@@ -396,18 +413,16 @@ def get_recent_trades(symbol: str) -> List[Trade]:
         return trades
 
     now = datetime.utcnow()
-    fallback_trades: List[Trade] = []
-    for i in range(10):
-        fallback_trades.append(
-            Trade(
-                trade_id=f"{symbol}-{i}",
-                price=float(20000 + (hash(symbol) % 5000) + i * 25),
-                quantity=float(0.5 + i * 0.1),
-                side="buy" if i % 2 == 0 else "sell",
-                timestamp=now - timedelta(minutes=i * 3),
-            )
+    return [
+        Trade(
+            trade_id=f"{symbol}-{i}",
+            price=float(20000 + (hash(symbol) % 5000) + i * 25),
+            quantity=float(0.5 + i * 0.1),
+            side="buy" if i % 2 == 0 else "sell",
+            timestamp=now - timedelta(minutes=i * 3),
         )
-    return fallback_trades
+        for i in range(10)
+    ]
 
 
 def _window_to_minutes(window: str) -> int:
@@ -474,7 +489,8 @@ def calculate_indicators(session: Session, symbol: str, indicators: Iterable[str
     closes = pd.Series([float(record.close) for record in records], index=[record.timestamp for record in records])
     latest_timestamp = records[-1].timestamp
     indicator_values: List[IndicatorValue] = []
-    requested = {item.lower() for item in indicators}
+    alias = {"boll": "bb"}
+    requested = {alias.get(item.lower(), item.lower()) for item in indicators}
 
     if "rsi" in requested:
         value = _calculate_rsi(closes)

@@ -3,22 +3,43 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_db
+from app.core.features import require_feature
 from app.core.responses import success_response
 from app.models.schemas.predictions import BatchPredictionRequest
 from app.services.prediction import (
     get_batch_predictions,
+    get_model,
     get_prediction_history,
     get_predictions,
-    get_model,
     list_models,
 )
 
+
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
 models_router = APIRouter(prefix="/models", tags=["Models"])
+
+
+@router.get("")
+def query_predictions(
+    symbol: str = Query(..., min_length=1),
+    horizon: List[str] | None = Query(None, alias="horizon"),
+    include_confidence: bool = Query(True),
+    include_factors: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    require_feature("predictions")
+    response = get_predictions(
+        db,
+        symbol=symbol,
+        horizons=horizon,
+        include_confidence=include_confidence,
+        include_factors=include_factors,
+    )
+    return success_response(response.model_dump())
 
 
 @router.get("/{symbol}")
@@ -29,6 +50,7 @@ def read_predictions(
     include_factors: bool = Query(False),
     db: Session = Depends(get_db),
 ):
+    require_feature("predictions")
     response = get_predictions(
         db,
         symbol=symbol,
@@ -41,8 +63,26 @@ def read_predictions(
 
 @router.post("/batch")
 def batch_predictions(payload: BatchPredictionRequest, db: Session = Depends(get_db)):
+    require_feature("predictions")
     responses = [item.model_dump() for item in get_batch_predictions(db, payload)]
     return success_response({"predictions": responses})
+
+
+@router.get("/history")
+def prediction_history_query(
+    symbol: str = Query(..., min_length=1),
+    limit: int = Query(100, ge=1, le=500),
+    include_accuracy: bool = Query(True),
+    db: Session = Depends(get_db),
+):
+    require_feature("predictions")
+    response = get_prediction_history(
+        db,
+        symbol=symbol,
+        include_accuracy=include_accuracy,
+        limit=limit,
+    )
+    return success_response(response.model_dump())
 
 
 @router.get("/{symbol}/history")
@@ -53,6 +93,7 @@ def prediction_history(
     include_accuracy: bool = Query(True),
     db: Session = Depends(get_db),
 ):
+    require_feature("predictions")
     response = get_prediction_history(
         db,
         symbol=symbol,
@@ -84,7 +125,7 @@ def list_model_metadata():
 def model_detail(model_id: str):
     model = get_model(model_id)
     if not model:
-        raise HTTPException(status_code=404, detail="Model not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     return success_response(
         {
             "model_id": model.model_id,
@@ -102,5 +143,5 @@ def model_detail(model_id: str):
 def model_metrics(model_id: str):
     model = get_model(model_id)
     if not model:
-        raise HTTPException(status_code=404, detail="Model not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     return success_response({"model_id": model.model_id, "metrics": model.metrics})

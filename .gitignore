@@ -8,6 +8,7 @@ __pycache__/
 *.log
 .env
 .env.*
+!.env.sample
 .mypy_cache/
 .pytest_cache/
 dist/

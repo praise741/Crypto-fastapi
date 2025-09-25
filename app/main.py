@@ -18,7 +18,7 @@ def create_app() -> FastAPI:
 
     setup_cors(app)
     setup_api_key_middleware(app)
-    app.add_middleware(RateLimitMiddleware, limit=200, window=60)
+    app.add_middleware(RateLimitMiddleware)
 
     app.include_router(api_router, prefix=settings.API_V1_STR)
 
