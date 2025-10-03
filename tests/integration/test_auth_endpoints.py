@@ -21,3 +21,9 @@ def test_register_and_login_flow(client: TestClient):
     me_data = me_response.json()
     assert me_data["success"] is True
     assert me_data["data"]["email"] == payload["email"]
+
+
+def test_register_rejects_overlong_password(client: TestClient):
+    payload = {"email": "oversized@example.com", "password": "x" * 80}
+    response = client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == 422

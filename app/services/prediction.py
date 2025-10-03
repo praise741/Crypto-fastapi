@@ -9,6 +9,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.cache import cache_result, invalidate_prefixes
 from app.models.database.market_data import MarketData
 from app.models.database.prediction import Prediction
 from app.models.schemas.predictions import (
@@ -219,6 +220,10 @@ def _generate_moving_average_predictions(
         )
 
 
+def _invalidate_prediction_cache(symbol: str) -> None:
+    invalidate_prefixes(f"predictions:{symbol.upper()}:")
+
+
 def _generate_prophet_predictions(db: Session, symbol: str, target_hours: Sequence[int]) -> None:
     symbol = symbol.upper()
     fetch_market_history(db, symbol)
@@ -243,6 +248,7 @@ def _generate_prophet_predictions(db: Session, symbol: str, target_hours: Sequen
     if settings.SIMPLE_BOOTSTRAP:
         _generate_moving_average_predictions(db, symbol, target_hours, df, current_price, generated_at)
         db.commit()
+        _invalidate_prediction_cache(symbol)
         return
 
     model = Prophet(
@@ -258,6 +264,7 @@ def _generate_prophet_predictions(db: Session, symbol: str, target_hours: Sequen
     except Exception:
         _generate_moving_average_predictions(db, symbol, target_hours, df, current_price, generated_at)
         db.commit()
+        _invalidate_prediction_cache(symbol)
         return
 
     max_horizon = max(target_hours)
@@ -267,6 +274,7 @@ def _generate_prophet_predictions(db: Session, symbol: str, target_hours: Sequen
     except Exception:
         _generate_moving_average_predictions(db, symbol, target_hours, df, current_price, generated_at)
         db.commit()
+        _invalidate_prediction_cache(symbol)
         return
     base_time = df["ds"].iloc[-1]
     forecast["horizon_hours"] = ((forecast["ds"] - base_time) / pd.Timedelta(hours=1)).round().astype(int)
@@ -302,6 +310,12 @@ def _generate_prophet_predictions(db: Session, symbol: str, target_hours: Sequen
         )
 
     db.commit()
+    _invalidate_prediction_cache(symbol)
+
+
+def _cache_key_for_predictions(symbol: str, horizons: Sequence[str] | None, include_confidence: bool, include_factors: bool) -> str:
+    horizon_key = ",".join(sorted(horizons)) if horizons else "default"
+    return f"predictions:{symbol.upper()}:{horizon_key}:{int(include_confidence)}:{int(include_factors)}"
 
 
 def get_predictions(
@@ -352,11 +366,33 @@ def get_predictions(
     )
 
 
+def get_cached_predictions(
+    db: Session,
+    symbol: str,
+    horizons: Sequence[str] | None = None,
+    include_confidence: bool = True,
+    include_factors: bool = False,
+) -> PredictionResponse:
+    cache_key = _cache_key_for_predictions(symbol, horizons, include_confidence, include_factors)
+
+    def _loader() -> dict:
+        return get_predictions(
+            db,
+            symbol=symbol,
+            horizons=horizons,
+            include_confidence=include_confidence,
+            include_factors=include_factors,
+        ).model_dump()
+
+    payload = cache_result(cache_key, 3600, _loader)
+    return PredictionResponse(**payload)
+
+
 def get_batch_predictions(db: Session, payload: BatchPredictionRequest, include_confidence: bool = True) -> List[PredictionResponse]:
     responses = []
     for symbol in payload.symbols:
         responses.append(
-            get_predictions(
+            get_cached_predictions(
                 db,
                 symbol=symbol,
                 horizons=payload.horizons,

@@ -11,6 +11,16 @@ class SymbolMetadata(BaseModel):
     sources: List[str] = Field(default_factory=list)
 
 
+class TrackSymbolRequest(BaseModel):
+    source: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TrackSymbolResponse(BaseModel):
+    symbol: SymbolMetadata
+    activated: bool = True
+
+
 class MarketPrice(BaseModel):
     symbol: str
     price: float

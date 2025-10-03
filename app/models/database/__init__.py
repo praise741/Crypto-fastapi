@@ -8,3 +8,4 @@ from app.models.database.portfolio import PortfolioAccount, PortfolioHolding, Po
 from app.models.database.prediction import Prediction
 from app.models.database.rate_limit import RateLimit
 from app.models.database.user import User
+from app.models.database.symbol import TrackedSymbol

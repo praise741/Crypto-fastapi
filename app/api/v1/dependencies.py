@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import decode_token
 from app.models.database.user import User
+from app.services.security import APIKeyInfo
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
@@ -43,3 +44,10 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
 
 def get_optional_api_key(request: Request) -> str | None:
     return getattr(request.state, "api_key", None)
+
+
+def get_active_api_key(request: Request) -> APIKeyInfo:
+    api_key = getattr(request.state, "api_key", None)
+    if not api_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key required")
+    return api_key

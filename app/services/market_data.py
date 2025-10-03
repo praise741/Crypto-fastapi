@@ -7,8 +7,10 @@ import pandas as pd
 from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
+from app.core.cache import cache_result, invalidate_cache, invalidate_prefixes
 from app.core.config import settings
 from app.models.database.market_data import MarketData
+from app.models.database.symbol import TrackedSymbol
 from app.models.schemas.market import (
     Candle,
     IndicatorResponse,
@@ -80,7 +82,7 @@ def _fallback_price(symbol: str) -> MarketPrice:
     )
 
 
-def list_symbols() -> List[SymbolMetadata]:
+def list_symbols(session: Session) -> List[SymbolMetadata]:
     symbols = {symbol.upper(): metadata for symbol, metadata in SYMBOL_METADATA.items()}
     for symbol in settings.SUPPORTED_SYMBOLS:
         if symbol.upper() not in symbols:
@@ -90,18 +92,97 @@ def list_symbols() -> List[SymbolMetadata]:
                 description=f"Synthetic metadata for {symbol.upper()}",
                 sources=["database"],
             )
-    return list(symbols.values())
+
+    tracked = (
+        session.query(TrackedSymbol)
+        .filter(TrackedSymbol.is_active.is_(True))
+        .order_by(TrackedSymbol.symbol.asc())
+        .all()
+    )
+    for record in tracked:
+        metadata = SymbolMetadata(
+            symbol=record.symbol.upper(),
+            name=record.symbol.upper(),
+            description=record.notes or f"Tracked symbol {record.symbol.upper()}",
+            sources=["database", "admin"] + ([record.source] if record.source else []),
+        )
+        symbols[metadata.symbol] = metadata
+
+    return sorted(symbols.values(), key=lambda item: item.symbol)
 
 
-def get_symbol(symbol: str) -> SymbolMetadata | None:
+def get_symbol(session: Session, symbol: str) -> SymbolMetadata | None:
     symbol = symbol.upper()
-    if symbol in SYMBOL_METADATA:
-        return SYMBOL_METADATA[symbol]
+    metadata = SYMBOL_METADATA.get(symbol)
+    if metadata:
+        return metadata
+
+    tracked = (
+        session.query(TrackedSymbol)
+        .filter(TrackedSymbol.symbol == symbol, TrackedSymbol.is_active.is_(True))
+        .first()
+    )
+    if tracked:
+        return SymbolMetadata(
+            symbol=symbol,
+            name=symbol,
+            description=tracked.notes or f"Tracked symbol {symbol}",
+            sources=["database", "admin"] + ([tracked.source] if tracked.source else []),
+        )
+
+    if symbol in {item.upper() for item in settings.SUPPORTED_SYMBOLS}:
+        return SymbolMetadata(
+            symbol=symbol,
+            name=symbol,
+            description=f"Synthetic metadata for {symbol}",
+            sources=["database"],
+        )
+
+    return None
+
+
+def track_symbol(
+    session: Session,
+    symbol: str,
+    *,
+    source: str | None = None,
+    notes: str | None = None,
+    added_by_api_key_id: str | None = None,
+) -> SymbolMetadata:
+    symbol = symbol.upper()
+    record = (
+        session.query(TrackedSymbol)
+        .filter(TrackedSymbol.symbol == symbol)
+        .first()
+    )
+    now = datetime.utcnow()
+    if record:
+        record.is_active = True
+        record.source = source or record.source
+        record.notes = notes or record.notes
+        record.added_by_api_key_id = added_by_api_key_id or record.added_by_api_key_id
+        record.activated_at = record.activated_at or now
+    else:
+        record = TrackedSymbol(
+            symbol=symbol,
+            source=source,
+            notes=notes,
+            added_by_api_key_id=added_by_api_key_id,
+            is_active=True,
+            activated_at=now,
+        )
+        session.add(record)
+    session.commit()
+    session.refresh(record)
+
+    invalidate_cache("market:prices", f"market:price:{symbol}")
+    invalidate_prefixes(f"market:ohlcv:{symbol}:", "analytics:")
+
     return SymbolMetadata(
         symbol=symbol,
         name=symbol,
-        description=f"Synthetic metadata for {symbol}",
-        sources=["database"],
+        description=record.notes or f"Tracked symbol {symbol}",
+        sources=["database", "admin"] + ([record.source] if record.source else []),
     )
 
 
@@ -296,11 +377,29 @@ def get_latest_price(session: Session, symbol: str) -> MarketPrice:
     )
 
 
+def get_cached_latest_price(session: Session, symbol: str) -> MarketPrice:
+    key = f"market:price:{symbol.upper()}"
+
+    def _loader() -> dict:
+        return get_latest_price(session, symbol).model_dump()
+
+    payload = cache_result(key, 30, _loader)
+    return MarketPrice(**payload)
+
+
 def get_all_prices(session: Session) -> List[MarketPrice]:
     prices: List[MarketPrice] = []
-    for symbol in settings.SUPPORTED_SYMBOLS:
-        prices.append(get_latest_price(session, symbol))
+    for metadata in list_symbols(session):
+        prices.append(get_latest_price(session, metadata.symbol))
     return prices
+
+
+def get_cached_prices(session: Session) -> List[MarketPrice]:
+    def _loader() -> List[dict]:
+        return [price.model_dump() for price in get_all_prices(session)]
+
+    payload = cache_result("market:prices", 30, _loader)
+    return [MarketPrice(**item) for item in payload]
 
 
 def get_ticker(session: Session, symbol: str) -> Ticker:
@@ -596,3 +695,13 @@ def get_ohlcv(session: Session, symbol: str, interval: str, limit: int) -> OHLCV
         for item in records
     ]
     return OHLCVResponse(symbol=symbol.upper(), interval=interval, candles=candles)
+
+
+def get_cached_ohlcv(session: Session, symbol: str, interval: str, limit: int) -> OHLCVResponse:
+    key = f"market:ohlcv:{symbol.upper()}:{interval}:{limit}"
+
+    def _loader() -> dict:
+        return get_ohlcv(session, symbol, interval, limit).model_dump()
+
+    payload = cache_result(key, 300, _loader)
+    return OHLCVResponse(**payload)

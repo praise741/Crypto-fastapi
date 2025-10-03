@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_db
+from app.core.http import apply_cache_headers
 from app.core.responses import success_response
 from app.services.indices import get_index, get_index_history, list_indices
 
@@ -16,12 +17,37 @@ def read_indices(db: Session = Depends(get_db)):
     return success_response({"indices": indices})
 
 
-@router.get("/{slug}")
-def read_index(slug: str, db: Session = Depends(get_db)):
+def _get_index_or_404(slug: str, db: Session) -> dict:
     index = get_index(db, slug)
     if not index:
         raise HTTPException(status_code=404, detail="Index not found")
-    return success_response(index.model_dump())
+    return index.model_dump()
+
+
+@router.get("/altseason")
+def read_altseason(response: Response, db: Session = Depends(get_db)):
+    payload = _get_index_or_404("altseason", db)
+    apply_cache_headers(response, 300)
+    return success_response(payload)
+
+
+@router.get("/fear-greed")
+def read_fear_greed(response: Response, db: Session = Depends(get_db)):
+    payload = _get_index_or_404("fear-greed", db)
+    apply_cache_headers(response, 300)
+    return success_response(payload)
+
+
+@router.get("/dominance")
+def read_dominance(response: Response, db: Session = Depends(get_db)):
+    payload = _get_index_or_404("dominance", db)
+    apply_cache_headers(response, 300)
+    return success_response(payload)
+
+
+@router.get("/{slug}")
+def read_index(slug: str, db: Session = Depends(get_db)):
+    return success_response(_get_index_or_404(slug, db))
 
 
 @router.get("/{slug}/history")
