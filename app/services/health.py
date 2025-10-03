@@ -23,7 +23,9 @@ def _check_database(session: Session) -> HealthStatus:
         session.execute("SELECT 1")
         return HealthStatus(name="database", status="healthy")
     except Exception as exc:  # pragma: no cover - defensive
-        return HealthStatus(name="database", status="degraded", details={"error": str(exc)})
+        return HealthStatus(
+            name="database", status="degraded", details={"error": str(exc)}
+        )
 
 
 def _check_redis() -> HealthStatus:
@@ -32,7 +34,9 @@ def _check_redis() -> HealthStatus:
         client.ping()
         return HealthStatus(name="redis", status="healthy")
     except Exception as exc:  # pragma: no cover
-        return HealthStatus(name="redis", status="degraded", details={"error": str(exc)})
+        return HealthStatus(
+            name="redis", status="degraded", details={"error": str(exc)}
+        )
 
 
 def _check_http_endpoint(name: str, url: str) -> HealthStatus:
@@ -40,7 +44,9 @@ def _check_http_endpoint(name: str, url: str) -> HealthStatus:
         response = httpx.get(url, timeout=5.0)
         if response.status_code < 500:
             return HealthStatus(name=name, status="healthy")
-        return HealthStatus(name=name, status="degraded", details={"status": str(response.status_code)})
+        return HealthStatus(
+            name=name, status="degraded", details={"status": str(response.status_code)}
+        )
     except Exception as exc:  # pragma: no cover
         return HealthStatus(name=name, status="degraded", details={"error": str(exc)})
 
@@ -49,9 +55,13 @@ def run_health_checks(session: Session) -> Dict[str, HealthStatus]:
     checks = {
         "database": _check_database(session),
         "redis": _check_redis(),
-        "coingecko": _check_http_endpoint("coingecko", f"{settings.COINGECKO_BASE_URL}/ping"),
+        "coingecko": _check_http_endpoint(
+            "coingecko", f"{settings.COINGECKO_BASE_URL}/ping"
+        ),
         "binance": _check_http_endpoint("binance", f"{settings.BINANCE_BASE_URL}/ping"),
     }
     if settings.DEXSCREENER_ENABLED:
-        checks["dexscreener"] = _check_http_endpoint("dexscreener", f"{settings.DEXSCREENER_BASE_URL}/search?q=eth")
+        checks["dexscreener"] = _check_http_endpoint(
+            "dexscreener", f"{settings.DEXSCREENER_BASE_URL}/search?q=eth"
+        )
     return checks

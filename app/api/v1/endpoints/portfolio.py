@@ -29,7 +29,9 @@ async def upload_portfolio(
     try:
         result = upsert_holdings_from_csv(db, current_user.id, content)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     return success_response(result.model_dump())
 
 
@@ -63,5 +65,7 @@ def get_performance_view(
     try:
         performance = get_performance(db, current_user.id, window)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return success_response(performance.model_dump())

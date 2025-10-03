@@ -22,7 +22,11 @@ class DexScreenerPair:
 class DexScreenerClient:
     """Utility for retrieving lightweight metrics from DexScreener."""
 
-    def __init__(self, base_url: str = "https://api.dexscreener.com/latest/dex", timeout: float = 10.0) -> None:
+    def __init__(
+        self,
+        base_url: str = "https://api.dexscreener.com/latest/dex",
+        timeout: float = 10.0,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
@@ -52,7 +56,9 @@ class DexScreenerClient:
             volume = pair["volume"].get("h24")
         updated_at = None
         if pair.get("pairCreatedAt"):
-            updated_at = datetime.fromtimestamp(pair["pairCreatedAt"] / 1000.0, tz=timezone.utc).replace(tzinfo=None)
+            updated_at = datetime.fromtimestamp(
+                pair["pairCreatedAt"] / 1000.0, tz=timezone.utc
+            ).replace(tzinfo=None)
         return DexScreenerPair(
             symbol=pair.get("baseToken", {}).get("symbol", symbol).upper(),
             pair_address=pair.get("pairAddress", ""),

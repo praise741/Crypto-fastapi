@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from app.api.middleware.authentication import setup_api_key_middleware
@@ -26,7 +25,12 @@ def create_app() -> FastAPI:
 
     @app.get("/", tags=["Root"])
     async def root():
-        return success_response({"message": "Welcome to the CryptoPrediction API", "version": settings.VERSION})
+        return success_response(
+            {
+                "message": "Welcome to the CryptoPrediction API",
+                "version": settings.VERSION,
+            }
+        )
 
     @app.on_event("startup")
     def on_startup() -> None:
@@ -41,7 +45,9 @@ app = create_app()
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-    openapi_schema = get_openapi(title=settings.APP_NAME, version=settings.VERSION, routes=app.routes)
+    openapi_schema = get_openapi(
+        title=settings.APP_NAME, version=settings.VERSION, routes=app.routes
+    )
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 

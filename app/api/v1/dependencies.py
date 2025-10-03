@@ -22,19 +22,30 @@ def get_db() -> Session:
         db.close()
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> User:
     try:
         payload = decode_token(token)
     except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        ) from exc
     user_id: str | None = payload.get("sub") if isinstance(payload, dict) else None
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
+        )
     return user
 
 
@@ -49,5 +60,7 @@ def get_optional_api_key(request: Request) -> str | None:
 def get_active_api_key(request: Request) -> APIKeyInfo:
     api_key = getattr(request.state, "api_key", None)
     if not api_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="API key required"
+        )
     return api_key

@@ -35,11 +35,15 @@ class BinanceDepthLevel:
 class BinanceClient:
     """Client for Binance public market data endpoints."""
 
-    def __init__(self, base_url: str = "https://api.binance.com/api/v3", timeout: float = 10.0) -> None:
+    def __init__(
+        self, base_url: str = "https://api.binance.com/api/v3", timeout: float = 10.0
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def _request(self, path: str, params: Optional[Dict[str, str]] = None) -> Optional[dict]:
+    def _request(
+        self, path: str, params: Optional[Dict[str, str]] = None
+    ) -> Optional[dict]:
         url = f"{self.base_url}{path}"
         try:
             response = httpx.get(url, params=params, timeout=self.timeout)
@@ -62,13 +66,17 @@ class BinanceClient:
         )
 
     def fetch_depth(self, symbol: str, limit: int = 50) -> Optional[dict]:
-        payload = self._request("/depth", {"symbol": symbol.upper() + "USDT", "limit": str(limit)})
+        payload = self._request(
+            "/depth", {"symbol": symbol.upper() + "USDT", "limit": str(limit)}
+        )
         if not payload:
             return None
         return payload
 
     def fetch_trades(self, symbol: str, limit: int = 200) -> List[BinanceTrade]:
-        payload = self._request("/trades", {"symbol": symbol.upper() + "USDT", "limit": str(limit)})
+        payload = self._request(
+            "/trades", {"symbol": symbol.upper() + "USDT", "limit": str(limit)}
+        )
         if not isinstance(payload, list):
             return []
         trades: List[BinanceTrade] = []

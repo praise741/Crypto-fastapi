@@ -127,7 +127,8 @@ def get_symbol(session: Session, symbol: str) -> SymbolMetadata | None:
             symbol=symbol,
             name=symbol,
             description=tracked.notes or f"Tracked symbol {symbol}",
-            sources=["database", "admin"] + ([tracked.source] if tracked.source else []),
+            sources=["database", "admin"]
+            + ([tracked.source] if tracked.source else []),
         )
 
     if symbol in {item.upper() for item in settings.SUPPORTED_SYMBOLS}:
@@ -150,11 +151,7 @@ def track_symbol(
     added_by_api_key_id: str | None = None,
 ) -> SymbolMetadata:
     symbol = symbol.upper()
-    record = (
-        session.query(TrackedSymbol)
-        .filter(TrackedSymbol.symbol == symbol)
-        .first()
-    )
+    record = session.query(TrackedSymbol).filter(TrackedSymbol.symbol == symbol).first()
     now = datetime.utcnow()
     if record:
         record.is_active = True
@@ -240,7 +237,9 @@ def fetch_market_history(
         return 0
 
     lookback_days = lookback_days or settings.MARKET_DATA_LOOKBACK_DAYS
-    candles = coin_gecko_client.fetch_market_chart(symbol, days=lookback_days, interval="hourly")
+    candles = coin_gecko_client.fetch_market_chart(
+        symbol, days=lookback_days, interval="hourly"
+    )
     inserted = 0
     if not candles:
         return inserted
@@ -366,7 +365,11 @@ def get_latest_price(session: Session, symbol: str) -> MarketPrice:
             .first()
         )
         if previous and previous.close:
-            change_24h = (float(record.close) - float(previous.close)) / float(previous.close) * 100
+            change_24h = (
+                (float(record.close) - float(previous.close))
+                / float(previous.close)
+                * 100
+            )
 
     return MarketPrice(
         symbol=symbol,
@@ -431,7 +434,9 @@ def get_ticker(session: Session, symbol: str) -> Ticker:
     close_price = prices[-1]
     high_price = max(prices)
     low_price = min(prices)
-    change_percent = ((close_price - open_price) / open_price) * 100 if open_price else 0.0
+    change_percent = (
+        ((close_price - open_price) / open_price) * 100 if open_price else 0.0
+    )
     volume = sum(float(item.volume or 0) for item in data)
     return Ticker(
         symbol=symbol,
@@ -453,16 +458,26 @@ def _build_order_levels(price: float, liquidity_usd: float | None) -> List[Depth
     for depth in range(1, 6):
         step = price * 0.005 * depth
         quantity = max(quantity_base * (1 - depth * 0.1), 0.1)
-        levels.append(DepthLevel(price=round(price - step, 2), quantity=float(quantity)))
+        levels.append(
+            DepthLevel(price=round(price - step, 2), quantity=float(quantity))
+        )
     return levels
 
 
 def get_order_book(symbol: str) -> OrderBook:
     payload = binance_client.fetch_depth(symbol, limit=50)
     if payload and payload.get("bids") and payload.get("asks"):
-        bids = [DepthLevel(price=float(price), quantity=float(qty)) for price, qty in payload["bids"][:20]]
-        asks = [DepthLevel(price=float(price), quantity=float(qty)) for price, qty in payload["asks"][:20]]
-        return OrderBook(symbol=symbol.upper(), bids=bids, asks=asks, timestamp=datetime.utcnow())
+        bids = [
+            DepthLevel(price=float(price), quantity=float(qty))
+            for price, qty in payload["bids"][:20]
+        ]
+        asks = [
+            DepthLevel(price=float(price), quantity=float(qty))
+            for price, qty in payload["asks"][:20]
+        ]
+        return OrderBook(
+            symbol=symbol.upper(), bids=bids, asks=asks, timestamp=datetime.utcnow()
+        )
 
     base_price = 20000 + (hash(symbol) % 5000)
     liquidity = None
@@ -472,8 +487,16 @@ def get_order_book(symbol: str) -> OrderBook:
             base_price = pair.price_usd
             liquidity = pair.liquidity_usd
     bids = _build_order_levels(base_price, liquidity)
-    asks = [DepthLevel(price=round(base_price + (base_price * 0.005 * (i + 1)), 2), quantity=level.quantity) for i, level in enumerate(bids)]
-    return OrderBook(symbol=symbol.upper(), bids=bids, asks=asks, timestamp=datetime.utcnow())
+    asks = [
+        DepthLevel(
+            price=round(base_price + (base_price * 0.005 * (i + 1)), 2),
+            quantity=level.quantity,
+        )
+        for i, level in enumerate(bids)
+    ]
+    return OrderBook(
+        symbol=symbol.upper(), bids=bids, asks=asks, timestamp=datetime.utcnow()
+    )
 
 
 def get_recent_trades(symbol: str) -> List[Trade]:
@@ -558,7 +581,9 @@ def _calculate_macd(series: pd.Series) -> Dict[str, float]:
     }
 
 
-def _calculate_bollinger(series: pd.Series, window: int = 20) -> Dict[str, float] | None:
+def _calculate_bollinger(
+    series: pd.Series, window: int = 20
+) -> Dict[str, float] | None:
     if len(series) < window:
         return None
     rolling_mean = series.rolling(window=window).mean()
@@ -572,7 +597,9 @@ def _calculate_bollinger(series: pd.Series, window: int = 20) -> Dict[str, float
     return {"middle": float(mean), "upper": upper, "lower": lower}
 
 
-def calculate_indicators(session: Session, symbol: str, indicators: Iterable[str]) -> IndicatorResponse:
+def calculate_indicators(
+    session: Session, symbol: str, indicators: Iterable[str]
+) -> IndicatorResponse:
     symbol = symbol.upper()
     records = (
         session.query(MarketData)
@@ -583,9 +610,14 @@ def calculate_indicators(session: Session, symbol: str, indicators: Iterable[str
     )
     if not records:
         latest = get_latest_price(session, symbol)
-        return IndicatorResponse(symbol=symbol, indicators=[], timestamp=latest.timestamp)
+        return IndicatorResponse(
+            symbol=symbol, indicators=[], timestamp=latest.timestamp
+        )
 
-    closes = pd.Series([float(record.close) for record in records], index=[record.timestamp for record in records])
+    closes = pd.Series(
+        [float(record.close) for record in records],
+        index=[record.timestamp for record in records],
+    )
     latest_timestamp = records[-1].timestamp
     indicator_values: List[IndicatorValue] = []
     alias = {"boll": "bb"}
@@ -623,10 +655,16 @@ def calculate_indicators(session: Session, symbol: str, indicators: Iterable[str
         bollinger = _calculate_bollinger(closes)
         if bollinger:
             indicator_values.append(
-                IndicatorValue(name="bb", value=bollinger["middle"], metadata={"upper": bollinger["upper"], "lower": bollinger["lower"]})
+                IndicatorValue(
+                    name="bb",
+                    value=bollinger["middle"],
+                    metadata={"upper": bollinger["upper"], "lower": bollinger["lower"]},
+                )
             )
 
-    return IndicatorResponse(symbol=symbol, indicators=indicator_values, timestamp=latest_timestamp)
+    return IndicatorResponse(
+        symbol=symbol, indicators=indicator_values, timestamp=latest_timestamp
+    )
 
 
 def get_market_stats(session: Session) -> MarketStats:
@@ -637,13 +675,17 @@ def get_market_stats(session: Session) -> MarketStats:
         total_market_cap += (price.price or 0) * 1_000_000
         total_volume += price.volume_24h or 0.0
 
-    bitcoin_price = next((p.price for p in prices if p.symbol == "BTC"), prices[0].price if prices else 0)
+    bitcoin_price = next(
+        (p.price for p in prices if p.symbol == "BTC"), prices[0].price if prices else 0
+    )
     dominance = 0.0
     if total_market_cap:
         dominance = (bitcoin_price * 1_000_000) / total_market_cap * 100
 
     sentiment = 50.0
-    pair = dex_screener_client.search_pair("BTC") if settings.DEXSCREENER_ENABLED else None
+    pair = (
+        dex_screener_client.search_pair("BTC") if settings.DEXSCREENER_ENABLED else None
+    )
     if pair and pair.transactions:
         buys = sum(stats.get("buys", 0) for stats in pair.transactions.values())
         sells = sum(stats.get("sells", 0) for stats in pair.transactions.values())
@@ -672,7 +714,9 @@ def _load_candles(session: Session, symbol: str, limit: int) -> List[MarketData]
     return list(reversed(records))
 
 
-def get_ohlcv(session: Session, symbol: str, interval: str, limit: int) -> OHLCVResponse:
+def get_ohlcv(
+    session: Session, symbol: str, interval: str, limit: int
+) -> OHLCVResponse:
     if settings.ENABLE_EXTERNAL_MARKET_DATA:
         existing_count = (
             session.query(MarketData)
@@ -697,7 +741,9 @@ def get_ohlcv(session: Session, symbol: str, interval: str, limit: int) -> OHLCV
     return OHLCVResponse(symbol=symbol.upper(), interval=interval, candles=candles)
 
 
-def get_cached_ohlcv(session: Session, symbol: str, interval: str, limit: int) -> OHLCVResponse:
+def get_cached_ohlcv(
+    session: Session, symbol: str, interval: str, limit: int
+) -> OHLCVResponse:
     key = f"market:ohlcv:{symbol.upper()}:{interval}:{limit}"
 
     def _loader() -> dict:

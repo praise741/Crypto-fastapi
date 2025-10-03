@@ -135,7 +135,9 @@ def list_model_metadata():
 def model_detail(model_id: str):
     model = get_model(model_id)
     if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
+        )
     return success_response(
         {
             "model_id": model.model_id,
@@ -153,5 +155,7 @@ def model_detail(model_id: str):
 def model_metrics(model_id: str):
     model = get_model(model_id)
     if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
+        )
     return success_response({"model_id": model.model_id, "metrics": model.metrics})

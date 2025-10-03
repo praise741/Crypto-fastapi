@@ -38,11 +38,22 @@ def test_get_predictions_trains_prophet(symbol: str) -> None:
             )
         session.commit()
 
-        response = get_predictions(session, symbol, horizons=["1h", "4h"], include_confidence=True, include_factors=True)
+        response = get_predictions(
+            session,
+            symbol,
+            horizons=["1h", "4h"],
+            include_confidence=True,
+            include_factors=True,
+        )
         assert response.symbol == symbol
         assert len(response.predictions) == 2
-        assert all(item.model_version in {MODEL_VERSION, "prophet-ma-fallback"} for item in response.predictions)
-        assert all(item.confidence_interval is not None for item in response.predictions)
+        assert all(
+            item.model_version in {MODEL_VERSION, "prophet-ma-fallback"}
+            for item in response.predictions
+        )
+        assert all(
+            item.confidence_interval is not None for item in response.predictions
+        )
         assert all(item.probability is not None for item in response.predictions)
     finally:
         session.close()

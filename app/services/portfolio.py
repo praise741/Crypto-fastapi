@@ -9,7 +9,11 @@ from typing import Dict, Iterable, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.database.portfolio import PortfolioAccount, PortfolioHolding, PortfolioSnapshot
+from app.models.database.portfolio import (
+    PortfolioAccount,
+    PortfolioHolding,
+    PortfolioSnapshot,
+)
 from app.models.schemas.portfolio import (
     PortfolioAllocationItem,
     PortfolioAllocationResponse,
@@ -58,7 +62,9 @@ def _parse_decimal(value: str | float | int | None) -> Decimal | None:
 
 
 def _aggregate_rows(rows: Iterable[dict]) -> Tuple[List[dict], int]:
-    aggregated: Dict[str, Dict[str, Decimal]] = defaultdict(lambda: {"quantity": Decimal(0), "cost_basis": Decimal(0)})
+    aggregated: Dict[str, Dict[str, Decimal]] = defaultdict(
+        lambda: {"quantity": Decimal(0), "cost_basis": Decimal(0)}
+    )
     skipped = 0
     for row in rows:
         symbol_raw = row.get("asset_symbol")
@@ -118,13 +124,17 @@ def _get_or_create_csv_account(session: Session, user_id: str) -> PortfolioAccou
     return account
 
 
-def upsert_holdings_from_csv(session: Session, user_id: str, content: bytes) -> PortfolioUploadResult:
+def upsert_holdings_from_csv(
+    session: Session, user_id: str, content: bytes
+) -> PortfolioUploadResult:
     rows, skipped = parse_portfolio_csv(content)
     if not rows:
         raise ValueError("No valid rows found in CSV upload")
 
     account = _get_or_create_csv_account(session, user_id)
-    session.query(PortfolioHolding).filter(PortfolioHolding.account_id == account.id).delete()
+    session.query(PortfolioHolding).filter(
+        PortfolioHolding.account_id == account.id
+    ).delete()
     imported = 0
     for row in rows:
         holding = PortfolioHolding(
@@ -137,7 +147,9 @@ def upsert_holdings_from_csv(session: Session, user_id: str, content: bytes) -> 
         imported += 1
     session.commit()
     record_snapshot(session, user_id)
-    return PortfolioUploadResult(account_id=account.id, imported_rows=imported, skipped_rows=skipped)
+    return PortfolioUploadResult(
+        account_id=account.id, imported_rows=imported, skipped_rows=skipped
+    )
 
 
 def _convert_decimal(value: Decimal | float | None) -> Decimal:
@@ -148,13 +160,23 @@ def _convert_decimal(value: Decimal | float | None) -> Decimal:
     return Decimal(str(value))
 
 
-def _compute_holdings_totals(holdings: List[PortfolioHoldingView]) -> Dict[str, Decimal]:
+def _compute_holdings_totals(
+    holdings: List[PortfolioHoldingView],
+) -> Dict[str, Decimal]:
     total_value = sum((holding.market_value or Decimal("0")) for holding in holdings)
-    total_cost = sum((_convert_decimal(holding.cost_basis) or Decimal("0")) for holding in holdings if holding.cost_basis)
+    total_cost = sum(
+        (_convert_decimal(holding.cost_basis) or Decimal("0"))
+        for holding in holdings
+        if holding.cost_basis
+    )
     total_quantity = sum(holding.quantity for holding in holdings)
     return {
-        "total_value": total_value.quantize(Decimal("0.01")) if total_value else Decimal("0"),
-        "total_cost": total_cost.quantize(Decimal("0.01")) if total_cost else Decimal("0"),
+        "total_value": total_value.quantize(Decimal("0.01"))
+        if total_value
+        else Decimal("0"),
+        "total_cost": total_cost.quantize(Decimal("0.01"))
+        if total_cost
+        else Decimal("0"),
         "total_quantity": total_quantity,
     }
 
@@ -170,7 +192,11 @@ def fetch_holdings(session: Session, user_id: str) -> PortfolioHoldingsResponse:
             account_id="",
             updated_at=datetime.utcnow(),
             holdings=[],
-            totals={"total_value": Decimal("0"), "total_cost": Decimal("0"), "total_quantity": Decimal("0")},
+            totals={
+                "total_value": Decimal("0"),
+                "total_cost": Decimal("0"),
+                "total_quantity": Decimal("0"),
+            },
         )
 
     holdings_models = (
@@ -183,7 +209,11 @@ def fetch_holdings(session: Session, user_id: str) -> PortfolioHoldingsResponse:
     for model in holdings_models:
         market_price = get_latest_price(session, model.asset_symbol)
         price_decimal = Decimal(str(market_price.price)) if market_price else None
-        market_value = price_decimal * Decimal(model.quantity) if price_decimal is not None else None
+        market_value = (
+            price_decimal * Decimal(model.quantity)
+            if price_decimal is not None
+            else None
+        )
         cost_basis = Decimal(model.cost_basis) if model.cost_basis is not None else None
         pnl_abs = None
         pnl_pct = None
@@ -255,7 +285,9 @@ def record_snapshot(session: Session, user_id: str) -> PortfolioSnapshot:
 WINDOW_TO_DAYS = {"7d": 7, "30d": 30, "90d": 90}
 
 
-def get_performance(session: Session, user_id: str, window: str) -> PortfolioPerformanceResponse:
+def get_performance(
+    session: Session, user_id: str, window: str
+) -> PortfolioPerformanceResponse:
     days = WINDOW_TO_DAYS.get(window)
     if days is None:
         raise ValueError("Unsupported window")

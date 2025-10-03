@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DECIMAL, DateTime, Float, Index, String
+from sqlalchemy import DECIMAL, DateTime, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.database.common import BaseModel

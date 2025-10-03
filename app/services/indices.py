@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.models.database.index import MarketIndex, MarketIndexValue
-from app.models.schemas.indices import IndexHistoryItem, IndexHistoryResponse, IndexResponse
+from app.models.schemas.indices import (
+    IndexHistoryItem,
+    IndexHistoryResponse,
+    IndexResponse,
+)
 
 DEFAULT_INDICES = {
     "altseason": "Altseason Index",

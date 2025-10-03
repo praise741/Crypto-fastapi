@@ -19,19 +19,21 @@ def setup_audit_middleware(app: FastAPI) -> None:
             status_code = response.status_code
         except Exception:
             logger.exception(
-                "Request failed", extra={"method": request.method, "path": request.url.path}
+                "Request failed",
+                extra={"method": request.method, "path": request.url.path},
             )
             raise
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
             api_key_id = getattr(request.state, "api_key_id", None)
             logger.info(
-                "audit", extra={
+                "audit",
+                extra={
                     "method": request.method,
                     "path": request.url.path,
                     "status_code": status_code,
                     "duration_ms": round(duration_ms, 2),
                     "api_key_id": api_key_id,
-                }
+                },
             )
         return response

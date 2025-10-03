@@ -32,7 +32,9 @@ class SubscriptionServer:
         try:
             while True:
                 try:
-                    message = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+                    message = await asyncio.wait_for(
+                        websocket.receive_json(), timeout=5.0
+                    )
                 except asyncio.TimeoutError:
                     await self._push_updates(websocket)
                     continue
@@ -42,12 +44,21 @@ class SubscriptionServer:
                 if action == "subscribe":
                     if len(symbols) > self.max_topics:
                         symbols = symbols[: self.max_topics]
-                    self.subscriptions[websocket] = {symbol.upper() for symbol in symbols}
-                    await websocket.send_json({"type": "subscribed", "symbols": list(self.subscriptions[websocket])})
+                    self.subscriptions[websocket] = {
+                        symbol.upper() for symbol in symbols
+                    }
+                    await websocket.send_json(
+                        {
+                            "type": "subscribed",
+                            "symbols": list(self.subscriptions[websocket]),
+                        }
+                    )
                 elif action == "unsubscribe":
                     for symbol in symbols:
                         self.subscriptions[websocket].discard(symbol.upper())
-                    await websocket.send_json({"type": "unsubscribed", "symbols": list(symbols)})
+                    await websocket.send_json(
+                        {"type": "unsubscribed", "symbols": list(symbols)}
+                    )
         except WebSocketDisconnect:
             await self.disconnect(websocket)
 
@@ -56,7 +67,9 @@ class SubscriptionServer:
         if not symbols:
             return
         for symbol in list(symbols)[: self.max_topics]:
-            payload = await asyncio.get_event_loop().run_in_executor(None, self.fetcher, symbol)
+            payload = await asyncio.get_event_loop().run_in_executor(
+                None, self.fetcher, symbol
+            )
             if payload:
                 await websocket.send_json(payload)
 

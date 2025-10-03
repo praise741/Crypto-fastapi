@@ -73,7 +73,9 @@ class CoinGeckoClient:
             "include_24hr_change": "true",
         }
         try:
-            response = httpx.get(url, headers=self._headers(), params=params, timeout=self.timeout)
+            response = httpx.get(
+                url, headers=self._headers(), params=params, timeout=self.timeout
+            )
             response.raise_for_status()
         except httpx.HTTPError:
             return None
@@ -86,9 +88,15 @@ class CoinGeckoClient:
         return CoinGeckoPrice(
             symbol=symbol.upper(),
             price=float(entry.get("usd", 0.0)),
-            change_24h=float(entry.get("usd_24h_change", 0.0)) if entry.get("usd_24h_change") is not None else None,
-            volume_24h=float(entry.get("usd_24h_vol", 0.0)) if entry.get("usd_24h_vol") is not None else None,
-            market_cap=float(entry.get("usd_market_cap", 0.0)) if entry.get("usd_market_cap") is not None else None,
+            change_24h=float(entry.get("usd_24h_change", 0.0))
+            if entry.get("usd_24h_change") is not None
+            else None,
+            volume_24h=float(entry.get("usd_24h_vol", 0.0))
+            if entry.get("usd_24h_vol") is not None
+            else None,
+            market_cap=float(entry.get("usd_market_cap", 0.0))
+            if entry.get("usd_market_cap") is not None
+            else None,
             timestamp=datetime.utcnow(),
         )
 
@@ -109,7 +117,9 @@ class CoinGeckoClient:
             "interval": interval,
         }
         try:
-            response = httpx.get(url, headers=self._headers(), params=params, timeout=self.timeout)
+            response = httpx.get(
+                url, headers=self._headers(), params=params, timeout=self.timeout
+            )
             response.raise_for_status()
         except httpx.HTTPError:
             return []
@@ -117,7 +127,9 @@ class CoinGeckoClient:
         payload = response.json()
         prices: List[List[float]] = payload.get("prices", [])
         volumes_lookup: Dict[int, float] = {
-            int(point[0]): float(point[1]) for point in payload.get("total_volumes", []) if len(point) == 2
+            int(point[0]): float(point[1])
+            for point in payload.get("total_volumes", [])
+            if len(point) == 2
         }
 
         candles: List[CoinGeckoCandle] = []
@@ -126,7 +138,9 @@ class CoinGeckoClient:
             if len(entry) != 2:
                 continue
             timestamp_ms, close_price = entry
-            dt = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc).replace(tzinfo=None)
+            dt = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc).replace(
+                tzinfo=None
+            )
             if previous_price is None:
                 open_price = close_price
             else:

@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.models.database.alert import Alert
 from app.models.database.notification import Notification
-from app.models.schemas.alerts import AlertCreate, AlertResponse, NotificationResponse, NotificationStats
+from app.models.schemas.alerts import (
+    AlertCreate,
+    AlertResponse,
+    NotificationResponse,
+    NotificationStats,
+)
 
 
 def serialize_alert(alert: Alert) -> AlertResponse:
@@ -26,7 +31,12 @@ def serialize_alert(alert: Alert) -> AlertResponse:
 
 
 def list_alerts(db: Session, user_id: str) -> List[AlertResponse]:
-    alerts = db.query(Alert).filter(Alert.user_id == user_id).order_by(Alert.created_at.desc()).all()
+    alerts = (
+        db.query(Alert)
+        .filter(Alert.user_id == user_id)
+        .order_by(Alert.created_at.desc())
+        .all()
+    )
     return [serialize_alert(alert) for alert in alerts]
 
 
@@ -46,7 +56,9 @@ def create_alert(db: Session, user_id: str, payload: AlertCreate) -> AlertRespon
 
 
 def get_alert(db: Session, user_id: str, alert_id: str) -> Alert | None:
-    return db.query(Alert).filter(Alert.id == alert_id, Alert.user_id == user_id).first()
+    return (
+        db.query(Alert).filter(Alert.id == alert_id, Alert.user_id == user_id).first()
+    )
 
 
 def update_alert(db: Session, alert: Alert, payload: AlertCreate) -> AlertResponse:
@@ -89,7 +101,9 @@ def list_notifications(db: Session, user_id: str) -> List[NotificationResponse]:
     ]
 
 
-def mark_notifications_read(db: Session, user_id: str, notification_ids: List[str]) -> int:
+def mark_notifications_read(
+    db: Session, user_id: str, notification_ids: List[str]
+) -> int:
     updated = (
         db.query(Notification)
         .filter(Notification.user_id == user_id, Notification.id.in_(notification_ids))
@@ -101,7 +115,11 @@ def mark_notifications_read(db: Session, user_id: str, notification_ids: List[st
 
 def get_notification_stats(db: Session, user_id: str) -> NotificationStats:
     total = db.query(Notification).filter(Notification.user_id == user_id).count()
-    unread = db.query(Notification).filter(Notification.user_id == user_id, Notification.read.is_(False)).count()
+    unread = (
+        db.query(Notification)
+        .filter(Notification.user_id == user_id, Notification.read.is_(False))
+        .count()
+    )
     channels: dict[str, int] = {}
     for channel, count in (
         db.query(Notification.channel, func.count(Notification.id))

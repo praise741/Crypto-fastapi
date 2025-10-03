@@ -10,7 +10,11 @@ def test_insights_endpoints(client: TestClient, monkeypatch):
 
     monkeypatch.setattr(
         "app.services.insights.compute_proxy_components",
-        lambda symbol: {"buy_sell_ratio": 0.4, "vol_change_24h": 0.1, "tx_velocity": 12},
+        lambda symbol: {
+            "buy_sell_ratio": 0.4,
+            "vol_change_24h": 0.1,
+            "tx_velocity": 12,
+        },
     )
 
     summary = client.get("/api/v1/insights/summary", params={"symbol": "BTC"})

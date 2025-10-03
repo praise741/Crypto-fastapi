@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.features import require_feature
 from app.core.responses import success_response
@@ -16,7 +16,9 @@ def web3_health(symbol: str = Query(..., min_length=1)):
     try:
         health = get_web3_health(symbol)
     except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
     return success_response(
         {
             "symbol": health.symbol,

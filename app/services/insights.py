@@ -44,7 +44,7 @@ def compute_proxy_components(symbol: str) -> Dict[str, float]:
     total_24 = buys_24 + sells_24
     ratio = _safe_ratio(buys_24 - sells_24, total_24)
     total_1h = float(h1.get("buys", 0) + h1.get("sells", 0))
-    tx_velocity = total_1h
+    _ = total_1h  # tx_velocity reserved for future use
     vol_change = 0.0
     if pair.volume_24h:
         # crude approximation: compare 1h extrapolated volume with 24h
@@ -57,11 +57,15 @@ def compute_proxy_components(symbol: str) -> Dict[str, float]:
 
 
 def compute_proxy_score(components: Dict[str, float]) -> float:
-    score = 0.6 * components.get("buy_sell_ratio", 0.0) + 0.4 * components.get("vol_change_24h", 0.0)
+    score = 0.6 * components.get("buy_sell_ratio", 0.0) + 0.4 * components.get(
+        "vol_change_24h", 0.0
+    )
     return max(min(score, 1.0), -1.0)
 
 
-def generate_proxy_events(symbol: str, components: Dict[str, float]) -> List[InsightEvent]:
+def generate_proxy_events(
+    symbol: str, components: Dict[str, float]
+) -> List[InsightEvent]:
     events: List[InsightEvent] = []
     ratio = components.get("buy_sell_ratio", 0.0)
     vol_change = components.get("vol_change_24h", 0.0)
@@ -122,7 +126,9 @@ def summarise_insights(session: Session, symbol: str, window: str) -> InsightSum
         .order_by(desc(InsightEvent.ts))
         .all()
     )
-    reddit_scores = [float(event.sentiment_score) for event in events if event.source == "REDDIT"]
+    reddit_scores = [
+        float(event.sentiment_score) for event in events if event.source == "REDDIT"
+    ]
     reddit_score = sum(reddit_scores) / len(reddit_scores) if reddit_scores else None
     combined_scores = [proxy_score] + reddit_scores
     avg_score = sum(combined_scores) / len(combined_scores) if combined_scores else 0.0
@@ -130,8 +136,7 @@ def summarise_insights(session: Session, symbol: str, window: str) -> InsightSum
     for event in events:
         counts[event.source] = counts.get(event.source, 0) + 1
     insight_components = [
-        InsightComponent(name=name, value=value)
-        for name, value in components.items()
+        InsightComponent(name=name, value=value) for name, value in components.items()
     ]
     return InsightSummary(
         symbol=symbol.upper(),
@@ -145,7 +150,9 @@ def summarise_insights(session: Session, symbol: str, window: str) -> InsightSum
     )
 
 
-def list_events(session: Session, symbol: str, limit: int = 50) -> InsightEventsResponse:
+def list_events(
+    session: Session, symbol: str, limit: int = 50
+) -> InsightEventsResponse:
     records = (
         session.query(InsightEvent)
         .filter(InsightEvent.asset_symbol == symbol.upper())
