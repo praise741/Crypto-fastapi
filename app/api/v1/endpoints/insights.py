@@ -22,7 +22,9 @@ def get_insight_summary(
     try:
         summary = summarise_insights(db, symbol, window)
     except Exception as exc:  # pragma: no cover - defensive
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
     return success_response(summary.model_dump())
 
 

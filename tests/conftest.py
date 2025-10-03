@@ -19,7 +19,9 @@ from app.models.database.user import User
 from app.services.security import create_api_key_for_user
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 import app.core.database as core_database
@@ -32,7 +34,7 @@ core_database.engine = engine
 def setup_database() -> None:
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    assert 'users' in Base.metadata.tables
+    assert "users" in Base.metadata.tables
     yield
     Base.metadata.drop_all(bind=engine)
 
@@ -66,7 +68,10 @@ def override_current_user(request: Request):
     with TestingSessionLocal() as session:
         user = session.query(User).first()
         if not user:
-            user = User(email="autouser@example.com", password_hash=get_password_hash("password123"))
+            user = User(
+                email="autouser@example.com",
+                password_hash=get_password_hash("password123"),
+            )
             session.add(user)
             session.commit()
             session.refresh(user)
@@ -81,7 +86,10 @@ def client() -> TestClient:
     with TestingSessionLocal() as session:
         user = session.query(User).first()
         if not user:
-            user = User(email="client@example.com", password_hash=get_password_hash("password123"))
+            user = User(
+                email="client@example.com",
+                password_hash=get_password_hash("password123"),
+            )
             session.add(user)
             session.commit()
             session.refresh(user)
@@ -95,7 +103,9 @@ def client() -> TestClient:
 @pytest.fixture
 def test_user(client: TestClient) -> dict:
     with TestingSessionLocal() as session:
-        user = User(email="tester@example.com", password_hash=get_password_hash("password123"))
+        user = User(
+            email="tester@example.com", password_hash=get_password_hash("password123")
+        )
         session.add(user)
         session.commit()
         session.refresh(user)

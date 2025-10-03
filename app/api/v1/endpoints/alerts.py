@@ -15,19 +15,31 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
 
 @router.get("")
-def list_user_alerts(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    data = [alert.model_dump() for alert in alert_service.list_alerts(db, current_user.id)]
+def list_user_alerts(
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
+):
+    data = [
+        alert.model_dump() for alert in alert_service.list_alerts(db, current_user.id)
+    ]
     return success_response({"alerts": data})
 
 
 @router.post("")
-def create_alert(payload: AlertCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def create_alert(
+    payload: AlertCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
     alert = alert_service.create_alert(db, current_user.id, payload)
     return success_response(alert.model_dump())
 
 
 @router.get("/{alert_id}")
-def read_alert(alert_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def read_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
     alert = alert_service.get_alert(db, current_user.id, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -35,7 +47,12 @@ def read_alert(alert_id: str, current_user: User = Depends(get_current_active_us
 
 
 @router.put("/{alert_id}")
-def update_alert(alert_id: str, payload: AlertCreate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def update_alert(
+    alert_id: str,
+    payload: AlertCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
     alert = alert_service.get_alert(db, current_user.id, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -44,7 +61,11 @@ def update_alert(alert_id: str, payload: AlertCreate, current_user: User = Depen
 
 
 @router.delete("/{alert_id}")
-def delete_alert(alert_id: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def delete_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
     alert = alert_service.get_alert(db, current_user.id, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -53,18 +74,30 @@ def delete_alert(alert_id: str, current_user: User = Depends(get_current_active_
 
 
 @router.get("/notifications")
-def list_notifications(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    notifications = [n.model_dump() for n in alert_service.list_notifications(db, current_user.id)]
+def list_notifications(
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
+):
+    notifications = [
+        n.model_dump() for n in alert_service.list_notifications(db, current_user.id)
+    ]
     return success_response({"notifications": notifications})
 
 
 @router.post("/notifications/mark-read")
-def mark_notifications(notification_ids: List[str] = Body(...), current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
-    updated = alert_service.mark_notifications_read(db, current_user.id, notification_ids)
+def mark_notifications(
+    notification_ids: List[str] = Body(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    updated = alert_service.mark_notifications_read(
+        db, current_user.id, notification_ids
+    )
     return success_response({"updated": updated})
 
 
 @router.get("/notifications/stats")
-def notification_stats(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+def notification_stats(
+    current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)
+):
     stats = alert_service.get_notification_stats(db, current_user.id)
     return success_response(stats.model_dump())

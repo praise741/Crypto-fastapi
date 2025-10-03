@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 def test_market_prices_parallel_requests(client: TestClient):
     start = perf_counter()
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(client.get, "/api/v1/market/prices") for _ in range(5)]
+        futures = [
+            executor.submit(client.get, "/api/v1/market/prices") for _ in range(5)
+        ]
     responses = [future.result() for future in futures]
     duration = perf_counter() - start
 

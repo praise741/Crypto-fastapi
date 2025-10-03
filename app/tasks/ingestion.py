@@ -10,7 +10,9 @@ from sqlalchemy import func
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.database.market_data import MarketData
-from app.services.market_data import calculate_indicators as service_calculate_indicators
+from app.services.market_data import (
+    calculate_indicators as service_calculate_indicators,
+)
 from app.services.market_data import fetch_market_history
 from app.services.prediction import get_predictions
 

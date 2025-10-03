@@ -30,10 +30,10 @@ def _calculate_liquidity_score(symbol: str) -> float:
     pair = dex_client.search_pair(symbol)
     if not pair:
         return 50.0  # Neutral if no data
-    
+
     liquidity = pair.liquidity or {}
     usd_liquidity = float(liquidity.get("usd", 0))
-    
+
     # Liquidity scoring thresholds
     if usd_liquidity >= 1_000_000:
         return 100.0
@@ -59,9 +59,9 @@ def _calculate_volume_score(symbol: str) -> float:
     pair = dex_client.search_pair(symbol)
     if not pair:
         return 50.0
-    
+
     volume_24h = pair.volume_24h or 0.0
-    
+
     # Volume scoring thresholds
     if volume_24h >= 10_000_000:
         return 100.0
@@ -90,14 +90,14 @@ def _calculate_holder_distribution_score(symbol: str) -> float:
     pair = dex_client.search_pair(symbol)
     if not pair:
         return 50.0
-    
+
     txns = pair.transactions or {}
     h24 = txns.get("h24", {})
-    
+
     buys = float(h24.get("buys", 0))
     sells = float(h24.get("sells", 0))
     total_txns = buys + sells
-    
+
     # More transactions = better distribution (proxy)
     if total_txns >= 1000:
         return 90.0
@@ -127,18 +127,18 @@ def _calculate_volatility_score(db: Session, symbol: str) -> float:
         .order_by(MarketData.timestamp.asc())
         .all()
     )
-    
+
     if len(records) < 2:
         return 50.0
-    
+
     prices = [float(record.close) for record in records]
     avg_price = sum(prices) / len(prices)
-    
+
     # Calculate price volatility (coefficient of variation)
     variance = sum((p - avg_price) ** 2 for p in prices) / len(prices)
-    std_dev = variance ** 0.5
+    std_dev = variance**0.5
     cv = _safe_ratio(std_dev, avg_price) * 100
-    
+
     # Score: lower volatility = higher score
     if cv <= 2:
         return 100.0
@@ -163,11 +163,11 @@ def _calculate_age_score(symbol: str) -> float:
     pair = dex_client.search_pair(symbol)
     if not pair or not pair.pair_created_at:
         return 50.0  # Unknown age, neutral score
-    
+
     try:
         created_at = datetime.fromisoformat(pair.pair_created_at.replace("Z", "+00:00"))
         age_days = (datetime.utcnow() - created_at).days
-        
+
         # Age scoring
         if age_days >= 365:
             return 100.0
@@ -193,43 +193,45 @@ def _detect_red_flags(db: Session, symbol: str) -> List[str]:
     Returns list of warning messages.
     """
     red_flags: List[str] = []
-    
+
     # Check liquidity
     pair = dex_client.search_pair(symbol)
     if pair:
         liquidity = pair.liquidity or {}
         usd_liquidity = float(liquidity.get("usd", 0))
-        
+
         if usd_liquidity < 10_000:
             red_flags.append("Very low liquidity - high rug pull risk")
-        
+
         # Check transaction patterns
         txns = pair.transactions or {}
         h24 = txns.get("h24", {})
         buys = float(h24.get("buys", 0))
         sells = float(h24.get("sells", 0))
         total_txns = buys + sells
-        
+
         if total_txns < 10:
             red_flags.append("Extremely low trading activity")
-        
+
         # Check buy/sell pressure imbalance
         if total_txns > 0:
             sell_ratio = _safe_ratio(sells, total_txns)
             if sell_ratio > 0.8:
                 red_flags.append("Heavy selling pressure - potential dump")
-        
+
         # Check age
         if pair.pair_created_at:
             try:
-                created_at = datetime.fromisoformat(pair.pair_created_at.replace("Z", "+00:00"))
+                created_at = datetime.fromisoformat(
+                    pair.pair_created_at.replace("Z", "+00:00")
+                )
                 age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
-                
+
                 if age_hours < 24:
                     red_flags.append("Token less than 24 hours old - extreme risk")
             except Exception:
                 pass
-    
+
     # Check price volatility
     cutoff = datetime.utcnow() - timedelta(hours=24)
     records = (
@@ -238,17 +240,19 @@ def _detect_red_flags(db: Session, symbol: str) -> List[str]:
         .limit(50)
         .all()
     )
-    
+
     if len(records) >= 10:
         prices = [float(record.close) for record in records]
         max_price = max(prices)
         min_price = min(prices)
-        
+
         if min_price > 0:
             price_swing = _safe_ratio(max_price - min_price, min_price) * 100
             if price_swing > 100:
-                red_flags.append(f"Extreme price volatility: {price_swing:.1f}% swing in 24h")
-    
+                red_flags.append(
+                    f"Extreme price volatility: {price_swing:.1f}% swing in 24h"
+                )
+
     return red_flags
 
 
@@ -283,7 +287,7 @@ def _generate_recommendation(overall_score: float, red_flags: List[str]) -> str:
 def calculate_token_health(db: Session, symbol: str) -> Dict:
     """
     Calculate comprehensive token health score.
-    
+
     Returns a dictionary with:
     - overall_score: 0-100 health score
     - health_level: excellent/good/moderate/poor/critical
@@ -292,23 +296,23 @@ def calculate_token_health(db: Session, symbol: str) -> Dict:
     - recommendation: investment recommendation
     """
     symbol = symbol.upper()
-    
+
     # Calculate individual component scores
     liquidity_score = _calculate_liquidity_score(symbol)
     volume_score = _calculate_volume_score(symbol)
     holder_score = _calculate_holder_distribution_score(symbol)
     volatility_score = _calculate_volatility_score(db, symbol)
     age_score = _calculate_age_score(symbol)
-    
+
     # Weighted average for overall score
     weights = {
-        "liquidity": 0.30,    # Most important - prevents rug pulls
-        "volume": 0.25,       # Trading activity
-        "volatility": 0.20,   # Price stability
+        "liquidity": 0.30,  # Most important - prevents rug pulls
+        "volume": 0.25,  # Trading activity
+        "volatility": 0.20,  # Price stability
         "holder_distribution": 0.15,  # Whale concentration
-        "age": 0.10,          # Establishment
+        "age": 0.10,  # Establishment
     }
-    
+
     overall_score = (
         liquidity_score * weights["liquidity"]
         + volume_score * weights["volume"]
@@ -316,16 +320,16 @@ def calculate_token_health(db: Session, symbol: str) -> Dict:
         + volatility_score * weights["volatility"]
         + age_score * weights["age"]
     )
-    
+
     # Detect red flags
     red_flags = _detect_red_flags(db, symbol)
-    
+
     # Classify health level
     health_level = _classify_health_level(overall_score)
-    
+
     # Generate recommendation
     recommendation = _generate_recommendation(overall_score, red_flags)
-    
+
     return {
         "symbol": symbol,
         "overall_score": round(overall_score, 2),
@@ -346,10 +350,10 @@ def calculate_token_health(db: Session, symbol: str) -> Dict:
 def get_cached_token_health(db: Session, symbol: str) -> Dict:
     """Get token health with caching."""
     cache_key = f"token_health:{symbol.upper()}"
-    
+
     def _loader() -> Dict:
         return calculate_token_health(db, symbol)
-    
+
     return cache_result(cache_key, 600, _loader)  # 10-minute cache
 
 
@@ -363,7 +367,7 @@ def compare_tokens(db: Session, symbols: List[str]) -> List[Dict]:
         except Exception:
             # Skip tokens that fail
             continue
-    
+
     # Sort by overall score descending
     results.sort(key=lambda x: x["overall_score"], reverse=True)
     return results

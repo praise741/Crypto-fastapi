@@ -12,7 +12,9 @@ queue = Queue("crypto_tasks", connection=redis_connection)
 
 
 def train_model(symbol: str, horizon: str) -> None:
-    print(f"Training model for {symbol} horizon={horizon} at {datetime.utcnow().isoformat()}")
+    print(
+        f"Training model for {symbol} horizon={horizon} at {datetime.utcnow().isoformat()}"
+    )
 
 
 def evaluate_models() -> None:

@@ -18,7 +18,12 @@ def success_response(data: Any, meta: Dict[str, Any] | None = None) -> Dict[str,
     return {"success": True, "data": data, "meta": build_meta(meta)}
 
 
-def error_response(code: str, message: str, details: Dict[str, Any] | None = None, status_code: int | None = None) -> Dict[str, Any]:
+def error_response(
+    code: str,
+    message: str,
+    details: Dict[str, Any] | None = None,
+    status_code: int | None = None,
+) -> Dict[str, Any]:
     payload = {
         "success": False,
         "error": {"code": code, "message": message, "details": details or {}},

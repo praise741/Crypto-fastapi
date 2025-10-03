@@ -36,14 +36,18 @@ def generate_api_key() -> Tuple[str, str]:
     return raw_key, hash_api_key(raw_key)
 
 
-def create_api_key_for_user(session: Session, user_id: str, *, name: str | None = None) -> Tuple[APIKeyInfo, str]:
+def create_api_key_for_user(
+    session: Session, user_id: str, *, name: str | None = None
+) -> Tuple[APIKeyInfo, str]:
     raw_key, key_hash = generate_api_key()
     api_key = APIKey(user_id=user_id, key_hash=key_hash, name=name)
     session.add(api_key)
     session.commit()
     session.refresh(api_key)
     logger.info("Issued API key %s for user %s", api_key.id, user_id)
-    return APIKeyInfo(id=api_key.id, user_id=api_key.user_id, name=api_key.name), raw_key
+    return APIKeyInfo(
+        id=api_key.id, user_id=api_key.user_id, name=api_key.name
+    ), raw_key
 
 
 def verify_api_key(session: Session, raw_key: str) -> APIKeyInfo | None:
@@ -72,6 +76,8 @@ def sign_webhook_payload(payload: bytes, *, secret: str | None = None) -> str:
     return digest.hexdigest()
 
 
-def verify_webhook_signature(payload: bytes, signature: str, *, secret: str | None = None) -> bool:
+def verify_webhook_signature(
+    payload: bytes, signature: str, *, secret: str | None = None
+) -> bool:
     expected = sign_webhook_payload(payload, secret=secret)
     return hmac.compare_digest(expected, signature)

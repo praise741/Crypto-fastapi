@@ -9,7 +9,10 @@ from app.services.security import verify_api_key_from_pool
 
 API_KEY_HEADER = "X-API-Key"
 PUBLIC_PATHS: tuple[str, ...] = (
-    "/", "/docs", "/openapi.json", "/redoc",
+    "/",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
     f"{settings.API_V1_STR}/auth",
     f"{settings.API_V1_STR}/auth/register",
     f"{settings.API_V1_STR}/auth/login",
@@ -19,7 +22,10 @@ PUBLIC_PATHS: tuple[str, ...] = (
 
 def _is_public(path: str) -> bool:
     normalized = path.rstrip("/") or "/"
-    return any(normalized == route or normalized.startswith(f"{route}/") for route in PUBLIC_PATHS)
+    return any(
+        normalized == route or normalized.startswith(f"{route}/")
+        for route in PUBLIC_PATHS
+    )
 
 
 def setup_api_key_middleware(app: FastAPI) -> None:

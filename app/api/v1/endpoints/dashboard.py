@@ -60,7 +60,12 @@ WIDGETS = [
         "description": "Model predictions per horizon",
         "endpoint": "/predictions?symbol={symbol}",
         "schema": {
-            "predictions": ["horizon", "predicted_price", "confidence_interval", "probability"],
+            "predictions": [
+                "horizon",
+                "predicted_price",
+                "confidence_interval",
+                "probability",
+            ],
         },
     },
 ]
@@ -69,4 +74,6 @@ WIDGETS = [
 @router.get("/metadata")
 def dashboard_metadata():
     require_feature("dashboard")
-    return success_response({"widgets": WIDGETS, "websockets": ["/ws/market", "/ws/predictions"]})
+    return success_response(
+        {"widgets": WIDGETS, "websockets": ["/ws/market", "/ws/predictions"]}
+    )

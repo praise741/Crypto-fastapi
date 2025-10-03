@@ -28,7 +28,9 @@ router = APIRouter(prefix="/market", tags=["Market Data"])
 
 @router.get("/symbols")
 def symbols(db: Session = Depends(get_db)):
-    return success_response({"symbols": [symbol.model_dump() for symbol in list_symbols(db)]})
+    return success_response(
+        {"symbols": [symbol.model_dump() for symbol in list_symbols(db)]}
+    )
 
 
 @router.get("/symbols/{symbol}")
@@ -110,10 +112,14 @@ def indicators(
     db: Session = Depends(get_db),
 ):
     allowed = {"rsi", "macd", "sma", "ema", "boll"}
-    requested = [item.strip().lower() for item in indicator_set.split(",") if item.strip()]
+    requested = [
+        item.strip().lower() for item in indicator_set.split(",") if item.strip()
+    ]
     invalid = [item for item in requested if item not in allowed]
     if invalid:
-        raise HTTPException(status_code=400, detail=f"Unsupported indicators: {', '.join(invalid)}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported indicators: {', '.join(invalid)}"
+        )
     data = calculate_indicators(db, symbol, requested)
     return success_response(data.model_dump())
 
@@ -133,7 +139,9 @@ def symbol_stats(symbol: str, response: Response, db: Session = Depends(get_db))
     latest = get_cached_latest_price(db, symbol)
     ticker = get_ticker(db, symbol)
     apply_cache_headers(response, 30)
-    return success_response({"price": latest.model_dump(), "ticker": ticker.model_dump()})
+    return success_response(
+        {"price": latest.model_dump(), "ticker": ticker.model_dump()}
+    )
 
 
 @router.post("/symbols/{symbol}/track", status_code=status.HTTP_201_CREATED)

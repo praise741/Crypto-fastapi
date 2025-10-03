@@ -29,7 +29,9 @@ MOMENTUM_SHORT_WINDOW = 6
 MOMENTUM_LONG_WINDOW = 18
 
 
-def _load_close_prices(session: Session, symbols: Iterable[str], window_hours: int) -> Dict[str, List[float]]:
+def _load_close_prices(
+    session: Session, symbols: Iterable[str], window_hours: int
+) -> Dict[str, List[float]]:
     cutoff = datetime.utcnow() - timedelta(hours=window_hours)
     closes: Dict[str, List[float]] = {}
     for symbol in symbols:
@@ -96,14 +98,24 @@ def _compute_correlation(session: Session) -> CorrelationMatrix:
     symbols = [symbol.symbol for symbol in list_symbols(session)][:8]
     series = _load_close_prices(session, symbols, CORRELATION_WINDOW_HOURS)
     if len(series) < 2:
-        entries = [CorrelationEntry(symbol=symbol, correlation=1.0) for symbol in symbols]
-        return CorrelationMatrix(base_symbol=symbols[0] if symbols else "BTC", entries=entries, window_hours=CORRELATION_WINDOW_HOURS)
+        entries = [
+            CorrelationEntry(symbol=symbol, correlation=1.0) for symbol in symbols
+        ]
+        return CorrelationMatrix(
+            base_symbol=symbols[0] if symbols else "BTC",
+            entries=entries,
+            window_hours=CORRELATION_WINDOW_HOURS,
+        )
 
     df = pd.DataFrame({key: values for key, values in series.items()})
     df = df.dropna(axis=1, how="all")
     if df.empty:
-        entries = [CorrelationEntry(symbol=symbol, correlation=1.0) for symbol in series.keys()]
-        return CorrelationMatrix(base_symbol="BTC", entries=entries, window_hours=CORRELATION_WINDOW_HOURS)
+        entries = [
+            CorrelationEntry(symbol=symbol, correlation=1.0) for symbol in series.keys()
+        ]
+        return CorrelationMatrix(
+            base_symbol="BTC", entries=entries, window_hours=CORRELATION_WINDOW_HOURS
+        )
 
     base_symbol = df.columns[0]
     correlations = df.corr().get(base_symbol, pd.Series())
@@ -111,7 +123,9 @@ def _compute_correlation(session: Session) -> CorrelationMatrix:
         CorrelationEntry(symbol=col, correlation=float(round(corr, 4)))
         for col, corr in correlations.items()
     ]
-    return CorrelationMatrix(base_symbol=base_symbol, entries=entries, window_hours=CORRELATION_WINDOW_HOURS)
+    return CorrelationMatrix(
+        base_symbol=base_symbol, entries=entries, window_hours=CORRELATION_WINDOW_HOURS
+    )
 
 
 def correlation_matrix(session: Session) -> CorrelationMatrix:
@@ -132,9 +146,20 @@ def volatility_metrics(session: Session) -> List[VolatilityMetric]:
             if len(values) < 2:
                 continue
             vol = float(pd.Series(values).pct_change().std() or 0.0)
-            metrics.append(VolatilityMetric(symbol=symbol, volatility=round(vol, 4), window_hours=VOLATILITY_WINDOW_HOURS))
+            metrics.append(
+                VolatilityMetric(
+                    symbol=symbol,
+                    volatility=round(vol, 4),
+                    window_hours=VOLATILITY_WINDOW_HOURS,
+                )
+            )
         if not metrics:
-            metrics = [VolatilityMetric(symbol=symbol, volatility=0.0, window_hours=VOLATILITY_WINDOW_HOURS) for symbol in symbols]
+            metrics = [
+                VolatilityMetric(
+                    symbol=symbol, volatility=0.0, window_hours=VOLATILITY_WINDOW_HOURS
+                )
+                for symbol in symbols
+            ]
         return [metric.model_dump() for metric in metrics]
 
     payload = cache_result("analytics:volatility", 300, _loader)
@@ -163,7 +188,9 @@ def trend_signals(session: Session) -> List[TrendSignal]:
             trend = "bullish" if change > 0 else "bearish" if change < 0 else "sideways"
             score = round(abs(change) / float(earlier.close or 1) * 100, 2)
             signals.append(
-                TrendSignal(symbol=symbol, trend=trend, score=score, updated_at=latest.timestamp)
+                TrendSignal(
+                    symbol=symbol, trend=trend, score=score, updated_at=latest.timestamp
+                )
             )
         if not signals:
             now = datetime.utcnow()
@@ -197,7 +224,12 @@ def pattern_signals(session: Session) -> List[PatternSignal]:
         if not signals:
             now = datetime.utcnow()
             signals = [
-                PatternSignal(symbol="BTC", pattern="consolidation", confidence=0.35, detected_at=now)
+                PatternSignal(
+                    symbol="BTC",
+                    pattern="consolidation",
+                    confidence=0.35,
+                    detected_at=now,
+                )
             ]
         ordered = sorted(signals, key=lambda item: item.confidence, reverse=True)
         return [signal.model_dump() for signal in ordered]
@@ -220,13 +252,25 @@ def performance_leaders(session: Session) -> List[PerformanceEntry]:
                 continue
             change = ((end - start) / start) * 100
             entries.append(
-                PerformanceEntry(symbol=symbol, return_percent=round(change, 2), period=f"{PERFORMANCE_WINDOW_HOURS}h")
+                PerformanceEntry(
+                    symbol=symbol,
+                    return_percent=round(change, 2),
+                    period=f"{PERFORMANCE_WINDOW_HOURS}h",
+                )
             )
 
         if not entries:
-            entries = [PerformanceEntry(symbol="BTC", return_percent=0.0, period=f"{PERFORMANCE_WINDOW_HOURS}h")]
+            entries = [
+                PerformanceEntry(
+                    symbol="BTC",
+                    return_percent=0.0,
+                    period=f"{PERFORMANCE_WINDOW_HOURS}h",
+                )
+            ]
 
-        ordered = sorted(entries, key=lambda item: item.return_percent, reverse=True)[:10]
+        ordered = sorted(entries, key=lambda item: item.return_percent, reverse=True)[
+            :10
+        ]
         return [entry.model_dump() for entry in ordered]
 
     payload = cache_result("analytics:top_performers", 300, _loader)
@@ -243,8 +287,16 @@ def momentum_leaders(session: Session) -> List[MomentumEntry]:
                 continue
             short = series.rolling(window=MOMENTUM_SHORT_WINDOW, min_periods=2).mean()
             long = series.rolling(window=MOMENTUM_LONG_WINDOW, min_periods=2).mean()
-            short_value = float(short.iloc[-1]) if not pd.isna(short.iloc[-1]) else float(series.iloc[-1])
-            long_value = float(long.iloc[-1]) if not pd.isna(long.iloc[-1]) else float(series.mean())
+            short_value = (
+                float(short.iloc[-1])
+                if not pd.isna(short.iloc[-1])
+                else float(series.iloc[-1])
+            )
+            long_value = (
+                float(long.iloc[-1])
+                if not pd.isna(long.iloc[-1])
+                else float(series.mean())
+            )
             if not long_value:
                 continue
             momentum_ratio = (short_value - long_value) / long_value
@@ -258,13 +310,21 @@ def momentum_leaders(session: Session) -> List[MomentumEntry]:
             else:
                 classification = "neutral"
             entries.append(
-                MomentumEntry(symbol=symbol, momentum_score=score, classification=classification)
+                MomentumEntry(
+                    symbol=symbol, momentum_score=score, classification=classification
+                )
             )
 
         if not entries:
-            entries = [MomentumEntry(symbol="BTC", momentum_score=0.0, classification="neutral")]
+            entries = [
+                MomentumEntry(
+                    symbol="BTC", momentum_score=0.0, classification="neutral"
+                )
+            ]
 
-        ordered = sorted(entries, key=lambda item: item.momentum_score, reverse=True)[:8]
+        ordered = sorted(entries, key=lambda item: item.momentum_score, reverse=True)[
+            :8
+        ]
         return [entry.model_dump() for entry in ordered]
 
     payload = cache_result("analytics:momentum", 300, _loader)

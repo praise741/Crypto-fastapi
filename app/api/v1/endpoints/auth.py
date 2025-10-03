@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -57,7 +57,9 @@ def _token_response(user: User) -> TokenPair:
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists"
+        )
     user = User(email=payload.email, password_hash=get_password_hash(payload.password))
     db.add(user)
     db.commit()
@@ -69,7 +71,10 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
     return success_response(_token_response(user).model_dump())
 
 
@@ -78,10 +83,14 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> dict:
     data = decode_token(payload.refresh_token)
     user_id = data.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token"
+        )
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     return success_response(_token_response(user).model_dump())
 
 
@@ -98,7 +107,9 @@ def me(current_user: User = Depends(get_current_active_user)) -> dict:
 @router.post("/forgot-password", summary="Trigger password reset process")
 def forgot_password(payload: ForgotPasswordRequest):
     # In production this would send an email. Here we return a dummy response.
-    return success_response({"message": f"Password reset email sent to {payload.email}"})
+    return success_response(
+        {"message": f"Password reset email sent to {payload.email}"}
+    )
 
 
 @router.post("/reset-password", summary="Reset password")
@@ -107,7 +118,9 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     user_id = data.get("sub")
     user = db.query(User).filter(User.id == user_id).first() if user_id else None
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     user.password_hash = get_password_hash(payload.password)
     user.updated_at = datetime.utcnow()
     db.add(user)

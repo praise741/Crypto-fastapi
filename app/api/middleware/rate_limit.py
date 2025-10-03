@@ -43,7 +43,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _match_rule(self, path: str) -> RateRule | None:
         for rule_path, limit, window in self.rules:
-            if path.startswith(rule_path) or path.startswith(f"{settings.API_V1_STR}{rule_path}"):
+            if path.startswith(rule_path) or path.startswith(
+                f"{settings.API_V1_STR}{rule_path}"
+            ):
                 return rule_path, limit, window
         return None
 
@@ -83,7 +85,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if self.redis:
             allowed, remaining, reset = self._consume_redis(match, identifier)
         else:
-            allowed, remaining, reset = self._consume_memory(match, f"{identifier}:{match[0]}")
+            allowed, remaining, reset = self._consume_memory(
+                match, f"{identifier}:{match[0]}"
+            )
 
         if not allowed:
             payload = error_response(
@@ -92,7 +96,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 status_code=429,
                 details={"limit": match[1], "window": match[2]},
             )
-            return Response(content=json.dumps(payload), status_code=429, media_type="application/json")
+            return Response(
+                content=json.dumps(payload),
+                status_code=429,
+                media_type="application/json",
+            )
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(match[1])
