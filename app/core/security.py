@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+MAX_PASSWORD_BYTES = 72
 
 
 class TokenError(Exception):
@@ -25,11 +25,18 @@ class SecurityService:
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+        except ValueError:
+            return False
 
     @staticmethod
     def get_password_hash(password: str) -> str:
-        return pwd_context.hash(password)
+        password_bytes = password.encode("utf-8")
+        if len(password_bytes) > MAX_PASSWORD_BYTES:
+            raise ValueError("Password must be at most 72 bytes")
+        salt = bcrypt.gensalt()
+        return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
     def _create_token(self, subject: str, expires_delta: timedelta) -> str:
         now = datetime.now(timezone.utc)

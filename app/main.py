@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from app.api.middleware.authentication import setup_api_key_middleware
+from app.api.middleware.audit import setup_audit_middleware
 from app.api.middleware.cors import setup_cors
 from app.api.middleware.rate_limit import RateLimitMiddleware
 from app.api.v1.router import api_router
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
 
     setup_cors(app)
     setup_api_key_middleware(app)
+    setup_audit_middleware(app)
     app.add_middleware(RateLimitMiddleware)
 
     app.include_router(api_router, prefix=settings.API_V1_STR)

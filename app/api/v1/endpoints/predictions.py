@@ -3,18 +3,19 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_db
 from app.core.features import require_feature
+from app.core.http import apply_cache_headers
 from app.core.responses import success_response
 from app.models.schemas.predictions import BatchPredictionRequest
 from app.services.prediction import (
+    get_cached_predictions,
     get_batch_predictions,
     get_model,
     get_prediction_history,
-    get_predictions,
     list_models,
 )
 
@@ -25,6 +26,7 @@ models_router = APIRouter(prefix="/models", tags=["Models"])
 
 @router.get("")
 def query_predictions(
+    http_response: Response,
     symbol: str = Query(..., min_length=1),
     horizon: List[str] | None = Query(None, alias="horizon"),
     include_confidence: bool = Query(True),
@@ -32,18 +34,20 @@ def query_predictions(
     db: Session = Depends(get_db),
 ):
     require_feature("predictions")
-    response = get_predictions(
+    prediction = get_cached_predictions(
         db,
         symbol=symbol,
         horizons=horizon,
         include_confidence=include_confidence,
         include_factors=include_factors,
     )
-    return success_response(response.model_dump())
+    apply_cache_headers(http_response, 3600)
+    return success_response(prediction.model_dump())
 
 
 @router.get("/{symbol}")
 def read_predictions(
+    http_response: Response,
     symbol: str,
     horizons: List[str] | None = Query(None),
     include_confidence: bool = Query(True),
@@ -51,20 +55,26 @@ def read_predictions(
     db: Session = Depends(get_db),
 ):
     require_feature("predictions")
-    response = get_predictions(
+    prediction = get_cached_predictions(
         db,
         symbol=symbol,
         horizons=horizons,
         include_confidence=include_confidence,
         include_factors=include_factors,
     )
-    return success_response(response.model_dump())
+    apply_cache_headers(http_response, 3600)
+    return success_response(prediction.model_dump())
 
 
 @router.post("/batch")
-def batch_predictions(payload: BatchPredictionRequest, db: Session = Depends(get_db)):
+def batch_predictions(
+    payload: BatchPredictionRequest,
+    http_response: Response,
+    db: Session = Depends(get_db),
+):
     require_feature("predictions")
     responses = [item.model_dump() for item in get_batch_predictions(db, payload)]
+    apply_cache_headers(http_response, 3600)
     return success_response({"predictions": responses})
 
 
