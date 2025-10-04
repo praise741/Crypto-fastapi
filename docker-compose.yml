@@ -1,48 +1,124 @@
 version: '3.9'
 
 services:
-  api:
+  # FastAPI Backend
+  backend:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - .:/app
+    container_name: marketmatrix-backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/cryptoprediction
+      # Database - Using PostgreSQL for production
+      - DATABASE_URL=postgresql+psycopg2://marketmatrix:${DB_PASSWORD:-changeme123}@postgres:5432/marketmatrix
+      
+      # Redis Cache
       - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=changeme
-      - SECRET_KEY=changeme
+      
+      # Feature Flags
+      - FEATURE_PREDICTIONS=1
+      - FEATURE_DASHBOARD=1
+      - FEATURE_ADVANCED_TOOLS=1
+      - FEATURE_WEB3_HEALTH=1
+      - FEATURE_PORTFOLIO=0
+      - FEATURE_INSIGHTS=0
+      
+      # API Configuration
+      - APP_NAME=Market Matrix
+      - API_V1_STR=/api/v1
+      - VERSION=0.2.0
+      
+      # External APIs (all free)
+      - COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
+      - BINANCE_BASE_URL=https://api.binance.com/api/v3
+      - DEXSCREENER_BASE_URL=https://api.dexscreener.com/latest/dex
+      
+      # Optional: Add API keys if you have them
+      - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
+      - BINANCE_API_KEY=${BINANCE_API_KEY:-}
+      
+      # Cache settings
+      - CACHE_TTL_SECONDS=60
+      
+      # Security (change these in production!)
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this}
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this}
+    
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    volumes:
+      # Persist SQLite if you want to use it instead of PostgreSQL
+      - ./data:/app/data
+    
+    networks:
+      - marketmatrix-network
 
-  worker:
-    build: .
-    command: rq worker crypto_tasks
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
-
+  # PostgreSQL Database
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: marketmatrix-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: cryptoprediction
+      POSTGRES_USER: marketmatrix
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
+      POSTGRES_DB: marketmatrix
+      POSTGRES_INITDB_ARGS: "-E UTF8"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketmatrix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - marketmatrix-network
 
+  # Redis Cache
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    container_name: marketmatrix-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - marketmatrix-network
+
+  # Next.js Frontend (optional - can be deployed separately on Vercel)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: marketmatrix-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://backend:8000
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - marketmatrix-network
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+
+networks:
+  marketmatrix-network:
+    driver: bridge

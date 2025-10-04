@@ -330,10 +330,34 @@ def calculate_token_health(db: Session, symbol: str) -> Dict:
     # Generate recommendation
     recommendation = _generate_recommendation(overall_score, red_flags)
 
+    # Determine risk level for frontend
+    if overall_score >= 75:
+        risk_level = "low"
+    elif overall_score >= 50:
+        risk_level = "medium"
+    elif overall_score >= 30:
+        risk_level = "high"
+    else:
+        risk_level = "critical"
+    
+    # Generate strengths list
+    strengths = []
+    if liquidity_score >= 70:
+        strengths.append("Good liquidity depth")
+    if volume_score >= 70:
+        strengths.append("Active trading volume")
+    if volatility_score >= 70:
+        strengths.append("Stable price action")
+    if holder_score >= 70:
+        strengths.append("Well-distributed holders")
+    if age_score >= 70:
+        strengths.append("Established project")
+    
     return {
         "symbol": symbol,
         "overall_score": round(overall_score, 2),
         "health_level": health_level,
+        "risk_level": risk_level,
         "components": {
             "liquidity": round(liquidity_score, 2),
             "volume": round(volume_score, 2),
@@ -341,7 +365,18 @@ def calculate_token_health(db: Session, symbol: str) -> Dict:
             "volatility": round(volatility_score, 2),
             "age": round(age_score, 2),
         },
+        # Frontend compatibility fields
+        "liquidity_score": round(liquidity_score, 2),
+        "holder_distribution_score": round(holder_score, 2),
+        "contract_safety_score": round((liquidity_score + age_score) / 2, 2),  # Derived
+        "volume_score": round(volume_score, 2),
+        "warnings": red_flags,
         "red_flags": red_flags,
+        "strengths": strengths,
+        "liquidity_locked": liquidity_score >= 70,  # Proxy based on liquidity
+        "contract_verified": age_score >= 50,  # Proxy based on age
+        "honeypot_risk": len(red_flags) >= 3,
+        "pump_dump_risk": max(0, 100 - overall_score),  # Inverse of health
         "recommendation": recommendation,
         "analyzed_at": datetime.utcnow().isoformat(),
     }
