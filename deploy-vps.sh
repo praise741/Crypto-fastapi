@@ -9,7 +9,8 @@ set -euo pipefail
 
 # ---------- CONFIGURATION ----------
 GITHUB_USER="praise741"
-GITHUB_PAT="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"
+# Set your GitHub Personal Access Token as environment variable
+# export GITHUB_PAT="your_token_here"
 REPO_URL="https://github.com/${GITHUB_USER}/Crypto-fastapi.git"
 APP_DIR="/root/Crypto-fastapi"
 SITE_NAME="marketmatrix"
@@ -86,20 +87,30 @@ fi
 say "🔑 Configuring Git credentials"
 git config --global user.name "${GITHUB_USER}"
 git config --global user.email "${GITHUB_USER}@users.noreply.github.com"
+
+# Check if GitHub PAT is set
+if [ -z "${GITHUB_PAT:-}" ]; then
+    warn "GitHub PAT not set. Please set GITHUB_PAT environment variable."
+    warn "Example: export GITHUB_PAT=your_token_here"
+    exit 1
+fi
+
 git config --global credential.helper store
 echo "https://${GITHUB_USER}:${GITHUB_PAT}@github.com" > /root/.git-credentials
 chmod 600 /root/.git-credentials
 
 # Clone or update repository
 say "📥 Cloning repository: ${REPO_URL}"
+REPO_URL_WITH_TOKEN="https://${GITHUB_USER}:${GITHUB_PAT}@github.com/${GITHUB_USER}/Crypto-fastapi.git"
+
 if [ -d "${APP_DIR}/.git" ]; then
     cd "${APP_DIR}"
-    git remote set-url origin "https://${GITHUB_USER}:${GITHUB_PAT}@github.com/${GITHUB_USER}/Crypto-fastapi.git"
+    git remote set-url origin "${REPO_URL_WITH_TOKEN}"
     git fetch --all --prune
     git reset --hard origin/main || git reset --hard origin/master || true
 else
     rm -rf "${APP_DIR}"
-    git clone "https://${GITHUB_USER}:${GITHUB_PAT}@github.com/${GITHUB_USER}/Crypto-fastapi.git" "${APP_DIR}"
+    git clone "${REPO_URL_WITH_TOKEN}" "${APP_DIR}"
     cd "${APP_DIR}"
 fi
 
