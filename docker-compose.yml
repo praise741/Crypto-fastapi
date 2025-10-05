@@ -98,7 +98,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
       POSTGRES_DB: marketmatrix
       POSTGRES_INITDB_ARGS: "-E UTF8"
-      POSTGRES_INITDB_ARGS: "-E UTF8"
       PGTZ: UTC
     ports:
       - "5432:5432"
