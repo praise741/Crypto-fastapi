@@ -3,59 +3,90 @@ version: '3.9'
 services:
   # FastAPI Backend
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: marketmatrix-backend
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      # Database - Using PostgreSQL for production
-      - DATABASE_URL=postgresql+psycopg2://marketmatrix:${DB_PASSWORD:-changeme123}@postgres:5432/marketmatrix
-      
+      # Database - Support both PostgreSQL and SQLite
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://marketmatrix:${DB_PASSWORD:-changeme123}@postgres:5432/marketmatrix}
+      - SQLITE_FALLBACK=${SQLITE_FALLBACK:-true}
+
       # Redis Cache
       - REDIS_URL=redis://redis:6379/0
-      
-      # Feature Flags
+
+      # Feature Flags - Enable all features for VPS
       - FEATURE_PREDICTIONS=1
       - FEATURE_DASHBOARD=1
       - FEATURE_ADVANCED_TOOLS=1
       - FEATURE_WEB3_HEALTH=1
-      - FEATURE_PORTFOLIO=0
-      - FEATURE_INSIGHTS=0
-      
+      - FEATURE_PORTFOLIO=1
+      - FEATURE_INSIGHTS=1
+      - FEATURE_WALLET=0
+
       # API Configuration
       - APP_NAME=Market Matrix
       - API_V1_STR=/api/v1
       - VERSION=0.2.0
-      
-      # External APIs (all free)
+      - ENVIRONMENT=production
+
+      # External APIs (all free - no API keys required)
       - COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
       - BINANCE_BASE_URL=https://api.binance.com/api/v3
       - DEXSCREENER_BASE_URL=https://api.dexscreener.com/latest/dex
-      
-      # Optional: Add API keys if you have them
+
+      # Optional API keys (not required for free tier)
       - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
       - BINANCE_API_KEY=${BINANCE_API_KEY:-}
-      
+
       # Cache settings
       - CACHE_TTL_SECONDS=60
-      
-      # Security (change these in production!)
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this}
-      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this}
-    
+
+      # Security (set by deployment script)
+      - JWT_SECRET=${JWT_SECRET:-}
+      - SECRET_KEY=${SECRET_KEY:-}
+
+      # Domain configuration
+      - DOMAIN=${DOMAIN:-localhost}
+
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0 --port 8000
+      --workers 1
+      --log-level info
+      --proxy-headers --forwarded-allow-ips='*'
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    
+
     volumes:
-      # Persist SQLite if you want to use it instead of PostgreSQL
+      # Persist data directory for SQLite fallback
       - ./data:/app/data
-    
+      - alembic_data:/app/alembic
+
     networks:
       - marketmatrix-network
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/v1/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # PostgreSQL Database
   postgres:
@@ -67,26 +98,34 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
       POSTGRES_DB: marketmatrix
       POSTGRES_INITDB_ARGS: "-E UTF8"
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      PGTZ: UTC
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U marketmatrix"]
+      test: ["CMD-SHELL", "pg_isready -U marketmatrix -d marketmatrix"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     networks:
       - marketmatrix-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
   # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: marketmatrix-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
+    # keep redis internal; no published port
     volumes:
       - redis_data:/data
     healthcheck:
@@ -94,8 +133,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - marketmatrix-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   # Next.js Frontend (optional - can be deployed separately on Vercel)
   # frontend:
@@ -117,6 +162,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  alembic_data:
     driver: local
 
 networks:

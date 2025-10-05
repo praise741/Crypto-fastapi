@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add -A)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nMake health endpoints public; harden DB URL; compose hygiene\n\n- Made /api/v1/health* endpoints public (no API key required)\n- Added health endpoint to PUBLIC_PATHS and rate limit exclusion\n- Normalized DATABASE_URL to add sslmode=disable for psycopg2\n- Added pool_pre_ping=True to database engine for connection resilience\n- Docker compose: removed Redis port exposure, added .env file, explicit uvicorn command\n- Frontend: Added standalone output and API rewrites for Docker deployment\n- Added test for public health endpoint access\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
