@@ -77,6 +77,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return count <= limit, remaining, reset
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        # don't rate-limit health checks
+        if request.url.path.startswith(f"{settings.API_V1_STR}/health"):
+            return await call_next(request)
         match = self._match_rule(request.url.path)
         if not match:
             return await call_next(request)

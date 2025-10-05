@@ -104,3 +104,13 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+# --- Normalize DATABASE_URL for psycopg2 if sslmode is missing ---
+if settings.DATABASE_URL.startswith("postgresql+psycopg2://"):
+    # append ?sslmode=disable if no query string present
+    url = settings.DATABASE_URL
+    if "sslmode=" not in url:
+        if "?" in url:
+            settings.DATABASE_URL = f"{url}&sslmode=disable"
+        else:
+            settings.DATABASE_URL = f"{url}?sslmode=disable"

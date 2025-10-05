@@ -13,6 +13,8 @@ PUBLIC_PATHS: tuple[str, ...] = (
     "/docs",
     "/openapi.json",
     "/redoc",
+    # Make all health endpoints public
+    f"{settings.API_V1_STR}/health",
     f"{settings.API_V1_STR}/auth",
     f"{settings.API_V1_STR}/auth/register",
     f"{settings.API_V1_STR}/auth/login",
@@ -32,7 +34,8 @@ def setup_api_key_middleware(app: FastAPI) -> None:
     @app.middleware("http")
     async def api_key_authentication(request: Request, call_next):
         path = request.url.path
-        if _is_public(path):
+        # Treat health endpoints as public first, then the general list
+        if path.startswith(f"{settings.API_V1_STR}/health") or _is_public(path):
             return await call_next(request)
 
         api_key_header: Optional[str] = request.headers.get(API_KEY_HEADER)

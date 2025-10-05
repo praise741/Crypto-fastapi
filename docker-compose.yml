@@ -10,6 +10,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       # Database - Support both PostgreSQL and SQLite
       - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://marketmatrix:${DB_PASSWORD:-changeme123}@postgres:5432/marketmatrix}
@@ -51,6 +53,13 @@ services:
 
       # Domain configuration
       - DOMAIN=${DOMAIN:-localhost}
+
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0 --port 8000
+      --workers 1
+      --log-level info
+      --proxy-headers --forwarded-allow-ips='*'
 
     depends_on:
       postgres:
@@ -116,8 +125,7 @@ services:
     container_name: marketmatrix-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
-    ports:
-      - "6379:6379"
+    # keep redis internal; no published port
     volumes:
       - redis_data:/data
     healthcheck:
