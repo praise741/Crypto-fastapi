@@ -8,9 +8,10 @@
 set -euo pipefail
 
 # ---------- CONFIGURATION ----------
-GITHUB_USER="praise741"
-# Set your GitHub Personal Access Token as environment variable
-# export GITHUB_PAT="your_token_here"
+# GitHub User and PAT should be set as environment variables
+# export GITHUB_USER="your_github_username"
+# export GITHUB_PAT="your_github_pat_token"
+GITHUB_USER="${GITHUB_USER:-$(whoami)}"
 REPO_URL="https://github.com/${GITHUB_USER}/Crypto-fastapi.git"
 APP_DIR="/root/Crypto-fastapi"
 SITE_NAME="marketmatrix"
