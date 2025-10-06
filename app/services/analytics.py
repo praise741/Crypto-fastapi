@@ -248,9 +248,12 @@ def performance_leaders(session: Session) -> List[PerformanceEntry]:
                 continue
             start = float(series.iloc[0])
             end = float(series.iloc[-1])
-            if not start:
+            if not start or start < 0.0001:  # Avoid division by very small numbers
                 continue
             change = ((end - start) / start) * 100
+            # Cap unrealistic returns (over 1000%)
+            if abs(change) > 1000:
+                continue
             entries.append(
                 PerformanceEntry(
                     symbol=symbol,

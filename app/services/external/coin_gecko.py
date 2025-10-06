@@ -165,3 +165,23 @@ class CoinGeckoClient:
 
     def fetch_supported_symbols(self) -> Iterable[str]:
         return COINGECKO_IDS.keys()
+
+    def fetch_global_data(self) -> Dict[str, float] | None:
+        """Fetch global crypto market data including total market cap and BTC dominance."""
+        url = f"{self.base_url}/global"
+        try:
+            response = httpx.get(
+                url, headers=self._headers(), timeout=self.timeout
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return None
+
+        payload = response.json()
+        data = payload.get("data", {})
+
+        return {
+            "total_market_cap": float(data.get("total_market_cap", {}).get("usd", 0.0)),
+            "total_volume": float(data.get("total_volume", {}).get("usd", 0.0)),
+            "btc_dominance": float(data.get("market_cap_percentage", {}).get("btc", 0.0)),
+        }

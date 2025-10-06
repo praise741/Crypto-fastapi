@@ -97,13 +97,18 @@ def get_dashboard(response: Response, db: Session = Depends(get_db)):
     # Get market prices
     prices = get_cached_prices(db)
 
-    # Calculate metrics
-    total_market_cap = 0  # Placeholder - would need separate market cap API
-    total_volume = sum(p.volume_24h or 0 for p in prices if p.volume_24h)
+    # Get global market data from CoinGecko
+    from app.services.market_data import coin_gecko_client
+    global_data = coin_gecko_client.fetch_global_data()
 
-    # Get BTC for dominance calculation
-    btc_price = next((p for p in prices if p.symbol == "BTC"), None)
-    btc_dominance = 0  # Placeholder - would need market cap data
+    if global_data:
+        total_market_cap = global_data["total_market_cap"]
+        btc_dominance = global_data["btc_dominance"]
+        total_volume = global_data["total_volume"]
+    else:
+        total_market_cap = 0
+        total_volume = sum(p.volume_24h or 0 for p in prices if p.volume_24h)
+        btc_dominance = 0
     
     # Get predictions for top symbols
     top_symbols = ["BTC", "ETH", "SOL", "BNB", "ADA"]
@@ -147,16 +152,23 @@ def get_dashboard_metrics(response: Response, db: Session = Depends(get_db)):
     
     prices = get_cached_prices(db)
 
-    total_market_cap = 0  # Placeholder - would need separate market cap API
-    total_volume = sum(p.volume_24h or 0 for p in prices if p.volume_24h)
+    # Get global market data from CoinGecko
+    from app.services.market_data import coin_gecko_client
+    global_data = coin_gecko_client.fetch_global_data()
 
-    btc_price = next((p for p in prices if p.symbol == "BTC"), None)
-    btc_dominance = 0  # Placeholder - would need market cap data
-    
+    if global_data:
+        total_market_cap = global_data["total_market_cap"]
+        btc_dominance = global_data["btc_dominance"]
+        total_volume = global_data["total_volume"]
+    else:
+        total_market_cap = 0
+        total_volume = sum(p.volume_24h or 0 for p in prices if p.volume_24h)
+        btc_dominance = 0
+
     apply_cache_headers(response, 60)
     return success_response({
         "total_market_cap": total_market_cap,
         "total_volume_24h": total_volume,
         "btc_dominance": round(btc_dominance, 2),
-        "fear_greed_index": 65
+        "fear_greed_index": 65  # TODO: Fetch from Alternative.me API
     })

@@ -31,8 +31,7 @@ def _calculate_liquidity_score(symbol: str) -> float:
     if not pair:
         return 50.0  # Neutral if no data
 
-    liquidity = pair.liquidity or {}
-    usd_liquidity = float(liquidity.get("usd", 0))
+    usd_liquidity = float(pair.liquidity_usd or 0)
 
     # Liquidity scoring thresholds
     if usd_liquidity >= 1_000_000:
@@ -159,32 +158,14 @@ def _calculate_age_score(symbol: str) -> float:
     Calculate token age score (0-100).
     Older tokens generally more established.
     """
-    # For free tier, use first_seen from DexScreener or default
+    # For free tier, use updated_at from DexScreener as proxy for age
     pair = dex_client.search_pair(symbol)
-    if not pair or not pair.pair_created_at:
+    if not pair:
         return 50.0  # Unknown age, neutral score
 
-    try:
-        created_at = datetime.fromisoformat(pair.pair_created_at.replace("Z", "+00:00"))
-        age_days = (datetime.utcnow() - created_at).days
-
-        # Age scoring
-        if age_days >= 365:
-            return 100.0
-        elif age_days >= 180:
-            return 85.0
-        elif age_days >= 90:
-            return 70.0
-        elif age_days >= 30:
-            return 55.0
-        elif age_days >= 7:
-            return 40.0
-        elif age_days >= 1:
-            return 25.0
-        else:
-            return 10.0  # Very new, high risk
-    except Exception:
-        return 50.0
+    # Since pair_created_at doesn't exist, return neutral score for established tokens
+    # TODO: Find another data source for token age (CoinGecko, CoinMarketCap)
+    return 75.0  # Assume established token
 
 
 def _detect_red_flags(db: Session, symbol: str) -> List[str]:
@@ -197,8 +178,7 @@ def _detect_red_flags(db: Session, symbol: str) -> List[str]:
     # Check liquidity
     pair = dex_client.search_pair(symbol)
     if pair:
-        liquidity = pair.liquidity or {}
-        usd_liquidity = float(liquidity.get("usd", 0))
+        usd_liquidity = float(pair.liquidity_usd or 0)
 
         if usd_liquidity < 10_000:
             red_flags.append("Very low liquidity - high rug pull risk")
@@ -219,18 +199,8 @@ def _detect_red_flags(db: Session, symbol: str) -> List[str]:
             if sell_ratio > 0.8:
                 red_flags.append("Heavy selling pressure - potential dump")
 
-        # Check age
-        if pair.pair_created_at:
-            try:
-                created_at = datetime.fromisoformat(
-                    pair.pair_created_at.replace("Z", "+00:00")
-                )
-                age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
-
-                if age_hours < 24:
-                    red_flags.append("Token less than 24 hours old - extreme risk")
-            except Exception:
-                pass
+        # Age check removed - pair_created_at doesn't exist in DexScreenerPair
+        # TODO: Add age check using another data source
 
     # Check price volatility
     cutoff = datetime.utcnow() - timedelta(hours=24)
