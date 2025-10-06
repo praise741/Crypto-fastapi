@@ -96,16 +96,14 @@ def get_dashboard(response: Response, db: Session = Depends(get_db)):
     
     # Get market prices
     prices = get_cached_prices(db)
-    
+
     # Calculate metrics
-    total_market_cap = sum(p.market_cap or 0 for p in prices if p.market_cap)
+    total_market_cap = 0  # Placeholder - would need separate market cap API
     total_volume = sum(p.volume_24h or 0 for p in prices if p.volume_24h)
-    
+
     # Get BTC for dominance calculation
     btc_price = next((p for p in prices if p.symbol == "BTC"), None)
-    btc_dominance = 0
-    if btc_price and btc_price.market_cap and total_market_cap > 0:
-        btc_dominance = (btc_price.market_cap / total_market_cap) * 100
+    btc_dominance = 0  # Placeholder - would need market cap data
     
     # Get predictions for top symbols
     top_symbols = ["BTC", "ETH", "SOL", "BNB", "ADA"]
@@ -148,14 +146,12 @@ def get_dashboard_metrics(response: Response, db: Session = Depends(get_db)):
     require_feature("dashboard")
     
     prices = get_cached_prices(db)
-    
-    total_market_cap = sum(p.market_cap or 0 for p in prices if p.market_cap)
+
+    total_market_cap = 0  # Placeholder - would need separate market cap API
     total_volume = sum(p.volume_24h or 0 for p in prices if p.volume_24h)
-    
+
     btc_price = next((p for p in prices if p.symbol == "BTC"), None)
-    btc_dominance = 0
-    if btc_price and btc_price.market_cap and total_market_cap > 0:
-        btc_dominance = (btc_price.market_cap / total_market_cap) * 100
+    btc_dominance = 0  # Placeholder - would need market cap data
     
     apply_cache_headers(response, 60)
     return success_response({

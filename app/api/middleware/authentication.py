@@ -19,6 +19,15 @@ PUBLIC_PATHS: tuple[str, ...] = (
     f"{settings.API_V1_STR}/auth/register",
     f"{settings.API_V1_STR}/auth/login",
     f"{settings.API_V1_STR}/auth/refresh",
+    # Make market data endpoints public for frontend
+    f"{settings.API_V1_STR}/market",
+    f"{settings.API_V1_STR}/predictions",
+    f"{settings.API_V1_STR}/analytics",
+    f"{settings.API_V1_STR}/indices",
+    f"{settings.API_V1_STR}/insights",
+    f"{settings.API_V1_STR}/dashboard",
+    f"{settings.API_V1_STR}/news",
+    f"{settings.API_V1_STR}/token-health",
 )
 
 

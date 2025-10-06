@@ -113,12 +113,21 @@ def _fallback_prediction_response(
     horizons: Sequence[str] | None,
     include_confidence: bool,
     include_factors: bool,
+    current_price: float,
 ) -> PredictionResponse:
     now = datetime.utcnow()
     items = []
     for idx, horizon in enumerate(horizons or ["24h"]):
+        # Generate slight variation around current price
+        price_variation = (idx + 1) * (current_price * 0.02)  # 2% per horizon
+        predicted = current_price + price_variation
+
         confidence = (
-            ConfidenceInterval(lower=19000, upper=21000, confidence=0.8)
+            ConfidenceInterval(
+                lower=predicted * 0.95,
+                upper=predicted * 1.05,
+                confidence=0.75
+            )
             if include_confidence
             else None
         )
@@ -133,7 +142,7 @@ def _fallback_prediction_response(
         items.append(
             PredictionItem(
                 horizon=horizon,
-                predicted_price=20000 + idx * 75,
+                predicted_price=predicted,
                 confidence_interval=confidence,
                 probability={"up": 0.55, "down": 0.45},
                 factors=factors,
@@ -141,7 +150,7 @@ def _fallback_prediction_response(
                 generated_at=now,
             )
         )
-    return PredictionResponse(symbol=symbol, current_price=20000.0, predictions=items)
+    return PredictionResponse(symbol=symbol, current_price=current_price, predictions=items)
 
 
 def _prepare_training_frame(records: Sequence[MarketData]) -> pd.DataFrame:
@@ -505,10 +514,12 @@ def get_predictions(
             .all()
         )
 
+    current_price = get_latest_price(db, symbol).price
+
     grouped = _group_by_horizon(records)
     if not grouped:
         return _fallback_prediction_response(
-            symbol, horizons, include_confidence, include_factors
+            symbol, horizons, include_confidence, include_factors, float(current_price)
         )
 
     ordered_predictions: List[PredictionItem] = []
@@ -521,10 +532,9 @@ def get_predictions(
 
     if not ordered_predictions:
         return _fallback_prediction_response(
-            symbol, horizons, include_confidence, include_factors
+            symbol, horizons, include_confidence, include_factors, float(current_price)
         )
 
-    current_price = get_latest_price(db, symbol).price
     return PredictionResponse(
         symbol=symbol,
         current_price=float(current_price),
