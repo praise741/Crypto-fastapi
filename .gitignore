@@ -30,3 +30,4 @@ node_modules/
 .env.local
 
 !.env.example
+nul

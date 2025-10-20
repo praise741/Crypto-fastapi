@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Search, 
+import {
+  TrendingUp,
+  TrendingDown,
   Activity,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -43,6 +41,60 @@ interface Prediction {
   }[];
 }
 
+interface ApiResponse {
+  success: boolean;
+  data?: {
+    predictions?: PredictionData[];
+    current_price?: number | string;
+    [key: string]: unknown;
+  };
+}
+
+interface PredictionData {
+  horizon: string;
+  predicted_price: number | string;
+  confidence_interval: {
+    lower: number | string;
+    upper: number | string;
+    confidence: number;
+  };
+  probability: {
+    up: number;
+    down: number;
+  };
+  factors: {
+    name: string;
+    impact: number;
+  }[];
+  model_version: string;
+  generated_at: string;
+  [key: string]: unknown;
+}
+
+interface ContractResponse {
+  success: boolean;
+  data?: {
+    token?: {
+      symbol: string;
+    };
+    pricing?: {
+      price_usd: number | string;
+    };
+    [key: string]: unknown;
+  };
+}
+
+// Helper function to safely parse scientific notation
+function parseFloatSafe(value: string | number): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    // Handle scientific notation
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
 interface Signal {
   type: 'entry' | 'exit' | 'hold';
   strength: 'strong' | 'moderate' | 'weak';
@@ -67,9 +119,103 @@ export default function PredictionsPage() {
     setPrediction(null);
 
     try {
-      const response = await apiClient.getPredictions(sym.toUpperCase());
-      setPrediction(response.data);
-    } catch (err) {
+      let symbol = sym.trim();
+      let contractData = null;
+
+      // Check if input is a contract address (starts with 0x)
+      if (symbol.toLowerCase().startsWith('0x')) {
+        // Try backend /predictions/by-contract first
+        try {
+          const byContract = await apiClient.getPredictionsByContract(symbol, undefined, {
+            horizons: '1h,4h,24h,7d',
+            include_confidence: true,
+            include_factors: true,
+          });
+          const byC = byContract as unknown as ApiResponse;
+          if (
+            byC.success &&
+            byC.data &&
+            Array.isArray(byC.data.predictions) &&
+            byC.data.predictions.length > 0
+          ) {
+            const responseData = byC.data as { symbol?: string; current_price?: number | string; predictions: PredictionData[] };
+            const fixedData = {
+              symbol: responseData.symbol ?? symbol,
+              current_price: parseFloatSafe(responseData.current_price || 0),
+              predictions: (responseData.predictions as PredictionData[]).map((pred: PredictionData) => ({
+                ...pred,
+                predicted_price: parseFloatSafe(pred.predicted_price),
+                confidence_interval: {
+                  ...pred.confidence_interval,
+                  lower: parseFloatSafe(pred.confidence_interval.lower),
+                  upper: parseFloatSafe(pred.confidence_interval.upper),
+                },
+              })),
+            } as Prediction;
+            setPrediction(fixedData);
+            setLoading(false);
+            return;
+          }
+        } catch { /* ignore and fallback */ }
+
+        // Fallback to GET /contracts to resolve symbol
+        const contractResponse = await apiClient.getContractData(symbol);
+        if ((contractResponse as unknown as ContractResponse).success) {
+          const data = (contractResponse as unknown as ContractResponse).data as ContractResponse['data'];
+          const maybeSymbol = data?.token?.symbol || (data as { symbol?: string })?.symbol;
+          if (maybeSymbol) {
+            symbol = maybeSymbol;
+            contractData = data;
+          } else {
+            setError('Contract address not found or token data unavailable');
+            return;
+          }
+        } else {
+          setError('Contract address not found or token data unavailable');
+          return;
+        }
+      }
+
+      // Get predictions with proper parameters
+      const response = await apiClient.getPredictions(symbol.toUpperCase(), {
+        horizons: '1h,4h,24h,7d',
+        include_confidence: true,
+        include_factors: true
+      });
+
+      if ((response as unknown as ApiResponse).success && (response as unknown as ApiResponse).data) {
+          // Check if we have prediction data with probability info
+          const responseData = (response as unknown as ApiResponse).data!;
+          if (responseData?.predictions &&
+              responseData.predictions.length > 0 &&
+              responseData.predictions[0]?.probability) {
+            // Fix scientific notation parsing
+          const fixedData = {
+            symbol: symbol,
+            current_price: parseFloatSafe(responseData.current_price || 0),
+            predictions: responseData.predictions.map((pred: PredictionData) => ({
+              ...pred,
+              predicted_price: parseFloatSafe(pred.predicted_price),
+              confidence_interval: {
+                ...pred.confidence_interval,
+                lower: parseFloatSafe(pred.confidence_interval.lower),
+                upper: parseFloatSafe(pred.confidence_interval.upper)
+              }
+            }))
+          };
+
+          // If predictions API returns 0 price but we have contract data, use contract price
+          if (fixedData.current_price === 0 && contractData && (contractData as ContractResponse['data'])?.pricing) {
+            fixedData.current_price = parseFloatSafe((contractData as ContractResponse['data'])!.pricing!.price_usd);
+          }
+          setPrediction(fixedData);
+        } else {
+          setError('No valid prediction data available for this token');
+        }
+      } else {
+        setError('No predictions available for this symbol');
+      }
+    } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: { message?: string } } } };
       setError(error.response?.data?.error?.message || 'Failed to load predictions');
     } finally {
@@ -77,52 +223,39 @@ export default function PredictionsPage() {
     }
   };
 
-  const handleSearch = () => {
-    if (symbol.trim()) {
-      loadPrediction(symbol);
-    }
-  };
-
+  
   const getSignal = (pred: Prediction): Signal => {
     if (!pred.predictions || pred.predictions.length === 0) {
       return { type: 'hold', strength: 'weak', reason: 'Insufficient data' };
     }
 
-    const shortTerm = pred.predictions.find(p => p.horizon === '1h' || p.horizon === '4h');
-    if (!shortTerm) {
-      return { type: 'hold', strength: 'weak', reason: 'No short-term prediction available' };
+    // Evaluate all horizons and pick the strongest risk-adjusted edge
+    let bestScore = -Infinity;
+    let best: Signal = { type: 'hold', strength: 'weak', reason: 'No strong edge' };
+    for (const p of pred.predictions) {
+      const up = p.probability?.up ?? 0.5;
+      const conf = p.confidence_interval?.confidence ?? 0.5;
+      const pc = pred.current_price > 0 ? ((p.predicted_price - pred.current_price) / pred.current_price) * 100 : 0;
+      const edge = (up - 0.5) * 2; // -1..1
+      const score = edge * (Math.abs(pc) / 100) * conf;
+
+      let type: Signal['type'] = 'hold';
+      let strength: Signal['strength'] = 'weak';
+      if (conf >= 0.6) {
+        if (score >= 0.2 && pc > 0.3) { type = 'entry'; strength = score >= 0.3 ? 'strong' : 'moderate'; }
+        else if (score <= -0.2 && pc < -0.3) { type = 'exit'; strength = score <= -0.3 ? 'strong' : 'moderate'; }
+        else { type = 'hold'; strength = 'moderate'; }
+      }
+
+      const reason = `${type === 'entry' ? 'Bullish' : type === 'exit' ? 'Bearish' : 'Neutral'} signal (${p.horizon}): ${(up*100).toFixed(0)}% up, ${pc.toFixed(2)}% expected change, ${(conf*100).toFixed(0)}% confidence`;
+      const thisSignal: Signal = { type, strength, reason };
+      if (Math.abs(score) > Math.abs(bestScore)) {
+        bestScore = score;
+        best = thisSignal;
+      }
     }
 
-    const priceChange = ((shortTerm.predicted_price - pred.current_price) / pred.current_price) * 100;
-    const upProbability = shortTerm.probability.up;
-
-    if (upProbability > 0.65 && priceChange > 2) {
-      return { 
-        type: 'entry', 
-        strength: 'strong', 
-        reason: `Strong bullish signal: ${upProbability * 100}% probability of ${priceChange.toFixed(2)}% gain` 
-      };
-    } else if (upProbability > 0.55 && priceChange > 1) {
-      return { 
-        type: 'entry', 
-        strength: 'moderate', 
-        reason: `Moderate bullish signal: ${upProbability * 100}% probability of ${priceChange.toFixed(2)}% gain` 
-      };
-    } else if (upProbability < 0.35 && priceChange < -2) {
-      return { 
-        type: 'exit', 
-        strength: 'strong', 
-        reason: `Strong bearish signal: ${(1 - upProbability) * 100}% probability of ${Math.abs(priceChange).toFixed(2)}% loss` 
-      };
-    } else if (upProbability < 0.45 && priceChange < -1) {
-      return { 
-        type: 'exit', 
-        strength: 'moderate', 
-        reason: `Moderate bearish signal: ${(1 - upProbability) * 100}% probability of ${Math.abs(priceChange).toFixed(2)}% loss` 
-      };
-    }
-
-    return { type: 'hold', strength: 'moderate', reason: 'Market conditions uncertain, hold position' };
+    return best;
   };
 
   return (
@@ -130,35 +263,19 @@ export default function PredictionsPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">AI Price Predictions</h1>
+          <h1 className="text-3xl font-bold tracking-tight">AI-Powered Predictions & Token Health</h1>
           <p className="text-muted-foreground mt-2">
             Know the right time to buy or sell with AI-powered predictions
           </p>
         </div>
 
-        {/* Search and Quick Select */}
+        {/* Popular Symbols */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Select Cryptocurrency</CardTitle>
-            <CardDescription>Choose from popular tokens or search for any symbol</CardDescription>
+            <CardTitle>Popular Cryptocurrencies</CardTitle>
+            <CardDescription>Click on any cryptocurrency to view AI-powered predictions</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-4">
-              <Input
-                placeholder="Enter symbol (e.g., BTC, ETH)"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="flex-1"
-              />
-              <Button onClick={handleSearch} disabled={loading}>
-                {loading ? (
-                  <Activity className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
             <div className="flex flex-wrap gap-2">
               {POPULAR_SYMBOLS.map((sym) => (
                 <Button
@@ -413,7 +530,7 @@ function PredictionDetails({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {prediction.factors.map((factor, index) => (
+            {prediction.factors?.map((factor, index) => (
               <div key={index} className="flex items-center justify-between">
                 <span className="text-sm capitalize">{factor.name.replace(/_/g, ' ')}</span>
                 <div className="flex items-center gap-2">

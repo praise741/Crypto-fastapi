@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone', // Required for Docker deployment
+  outputFileTracingRoot: './', // Fix for multiple lockfiles warning
   // API rewrites for production
   async rewrites() {
     return [
@@ -12,6 +13,15 @@ const nextConfig: NextConfig = {
           : 'http://localhost:8000/api/:path*',
       },
     ];
+  },
+  // Image domains for Next.js Image component
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.102-212-247-217.sslip.io',
+      },
+    ],
   },
 };
 

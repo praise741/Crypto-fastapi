@@ -1,6 +1,13 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Extend InternalAxiosRequestConfig to include metadata
+interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
+  metadata?: {
+    startTime: number;
+  };
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.102-212-247-217.sslip.io';
 const API_VERSION = '/api/v1';
 
 class ApiClient {
@@ -15,28 +22,38 @@ class ApiClient {
       timeout: 30000,
     });
 
-    // Request interceptor
+    // Request interceptor with timing
     this.client.interceptors.request.use(
-      (config) => {
+      (config: InternalAxiosRequestConfig) => {
         const token = this.getToken();
-        if (token) {
+        if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-        return config;
+
+        // Add request start time for timing measurement
+        const extendedConfig = config as ExtendedAxiosRequestConfig;
+        extendedConfig.metadata = { startTime: Date.now() };
+
+        return extendedConfig;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        return Promise.reject(error);
+      }
     );
 
-    // Response interceptor
+    // Response interceptor with timing
     this.client.interceptors.response.use(
-      (response) => response.data,
-      (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          this.clearToken();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
+      (response) => {
+        // Handle backend response structure { success, data, meta }
+        if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+          return response.data;
         }
+
+        // Fallback for direct response data
+        return response.data;
+      },
+      (error: AxiosError) => {
+        // Note: Removed 401 redirect since we removed auth pages
         return Promise.reject(error);
       }
     );
@@ -107,8 +124,28 @@ class ApiClient {
   }
 
   // Prediction endpoints
-  async getPredictions(symbol: string, params?: { horizon?: string }) {
+  async getPredictions(symbol: string, params?: { horizons?: string; include_confidence?: boolean; include_factors?: boolean }) {
     return this.client.get(`/predictions/${symbol}`, { params });
+  }
+
+  // New: predictions by contract address (backend now supports this)
+  async getPredictionsByContract(contractAddress: string, chainId?: string | number, params?: { horizons?: string; include_confidence?: boolean; include_factors?: boolean }) {
+    return this.client.post('/predictions/by-contract', {
+      contract_address: contractAddress,
+      ...(chainId !== undefined && chainId !== null ? { chain_id: chainId } : {}),
+      ...(params?.horizons ? { horizons: params.horizons } : {}),
+      ...(params?.include_confidence !== undefined ? { include_confidence: params.include_confidence } : {}),
+      ...(params?.include_factors !== undefined ? { include_factors: params.include_factors } : {}),
+    });
+  }
+
+  // Contract endpoints
+  async getContractData(contractAddress: string) {
+    return this.client.get(`/contracts/${contractAddress}`);
+  }
+
+  async getContractPairs(contractAddress: string) {
+    return this.client.get(`/contracts/${contractAddress}/pairs`);
   }
 
   async getBatchPredictions(symbols: string[], horizons: string[]) {
@@ -126,6 +163,14 @@ class ApiClient {
 
   async analyzeToken(symbol: string) {
     return this.client.get(`/token-health/${symbol}`);
+  }
+
+  // Token Analytics endpoints
+  async analyzeTokenByContract(contractAddress: string, chainId?: string) {
+    return this.client.post('/token-analytics/analyze', {
+      contract_address: contractAddress,
+      ...(chainId && { chain_id: chainId })
+    });
   }
 
   // Portfolio endpoints

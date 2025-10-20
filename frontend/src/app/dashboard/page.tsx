@@ -6,14 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Activity, DollarSign, AlertTriangle } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
-import { formatCurrency, formatPercentage, getChangeColor } from '@/lib/utils';
+import { formatCurrency, formatPercentage, getChangeColor, formatDate } from '@/lib/utils';
 
 interface MarketData {
   symbol: string;
   price: number;
-  change_24h: number;
+  change_24h: number | null;
   volume_24h: number;
-  market_cap?: number;
+  timestamp: string;
 }
 
 interface Prediction {
@@ -32,6 +32,21 @@ interface DashboardMetrics {
   fear_greed_index: number;
 }
 
+interface DashboardResponse {
+  success: boolean;
+  data: {
+    metrics?: DashboardMetrics;
+    predictions?: Prediction[];
+  };
+}
+
+interface PricesResponse {
+  success: boolean;
+  data: {
+    prices?: MarketData[];
+  };
+}
+
 export default function DashboardPage() {
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -47,17 +62,21 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       const [dashboardRes, pricesRes] = await Promise.all([
-        apiClient.getDashboard().catch(() => ({ data: null })),
-        apiClient.getMarketPrices().catch(() => ({ data: [] })),
+        apiClient.getDashboard().catch(() => ({ success: false, data: null })),
+        apiClient.getMarketPrices().catch(() => ({ success: false, data: null })),
       ]);
 
-      if (dashboardRes.data) {
-        setMetrics(dashboardRes.data.metrics);
-        setPredictions(dashboardRes.data.predictions || []);
+      // Handle dashboard response
+      if ((dashboardRes as unknown as DashboardResponse).success && (dashboardRes as unknown as DashboardResponse).data?.metrics) {
+        setMetrics((dashboardRes as unknown as DashboardResponse).data.metrics || null);
+        if ((dashboardRes as unknown as DashboardResponse).data.predictions) {
+          setPredictions((dashboardRes as unknown as DashboardResponse).data.predictions || []);
+        }
       }
 
-      if (pricesRes.data) {
-        setMarketData(pricesRes.data);
+      // Handle market prices response
+      if ((pricesRes as unknown as PricesResponse).success && (pricesRes as unknown as PricesResponse).data?.prices) {
+        setMarketData((pricesRes as unknown as PricesResponse).data.prices || []);
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -67,11 +86,13 @@ export default function DashboardPage() {
   };
 
   const topGainers = [...marketData]
-    .sort((a, b) => b.change_24h - a.change_24h)
+    .filter(asset => asset.change_24h !== null)
+    .sort((a, b) => (b.change_24h || 0) - (a.change_24h || 0))
     .slice(0, 5);
 
   const topLosers = [...marketData]
-    .sort((a, b) => a.change_24h - b.change_24h)
+    .filter(asset => asset.change_24h !== null)
+    .sort((a, b) => (a.change_24h || 0) - (b.change_24h || 0))
     .slice(0, 5);
 
   if (loading) {
@@ -105,7 +126,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {metrics?.total_market_cap ? formatCurrency(metrics.total_market_cap, 0) : 'N/A'}
+                {metrics?.total_market_cap ? formatCurrency(metrics.total_market_cap, 0) : '📊 Loading...'}
               </div>
             </CardContent>
           </Card>
@@ -117,7 +138,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {metrics?.total_volume_24h ? formatCurrency(metrics.total_volume_24h, 0) : 'N/A'}
+                {metrics?.total_volume_24h ? formatCurrency(metrics.total_volume_24h, 0) : '📊 Loading...'}
               </div>
             </CardContent>
           </Card>
@@ -129,7 +150,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {metrics?.btc_dominance ? `${metrics.btc_dominance.toFixed(2)}%` : 'N/A'}
+                {metrics?.btc_dominance ? `${metrics.btc_dominance.toFixed(2)}%` : '📊 Loading...'}
               </div>
             </CardContent>
           </Card>
@@ -141,7 +162,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {metrics?.fear_greed_index || 'N/A'}
+                {metrics?.fear_greed_index || '📊 Loading...'}
               </div>
               {metrics?.fear_greed_index && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -231,14 +252,17 @@ function MarketAssetRow({ asset }: { asset: MarketData }) {
         <div>
           <p className="font-semibold">{asset.symbol}</p>
           <p className="text-sm text-muted-foreground">{formatCurrency(asset.price)}</p>
+          <p className="text-xs text-muted-foreground">{formatDate(asset.timestamp)}</p>
         </div>
       </div>
       <div className="text-right">
         <div className={`flex items-center gap-1 ${getChangeColor(asset.change_24h)}`}>
-          {asset.change_24h >= 0 ? (
+          {asset.change_24h !== null && asset.change_24h >= 0 ? (
             <TrendingUp className="h-4 w-4" />
-          ) : (
+          ) : asset.change_24h !== null ? (
             <TrendingDown className="h-4 w-4" />
+          ) : (
+            <Activity className="h-4 w-4 text-gray-400" />
           )}
           <span className="font-semibold">{formatPercentage(asset.change_24h)}</span>
         </div>

@@ -1,0 +1,1 @@
+{"success":true,"data":{"status":"healthy","services":{"database":"healthy","redis":"healthy","coingecko":"healthy","binance":"healthy","dexscreener":"healthy"}},"meta":{"timestamp":"2025-10-07T19:22:22.696137+00:00","version":"0.2.0"}}

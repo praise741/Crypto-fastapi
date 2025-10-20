@@ -2,50 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Market Matrix Fonts - Same as marketmatrix.space */
+@font-face {
+  font-family: 'Enter The Grid Regular';
+  src: url('/fonts/EnterTheGrid-Regular.woff2') format('woff2');
+  font-display: block;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Meutas Regular';
+  src: url('/fonts/Meutas-Regular.woff2') format('woff2');
+  font-display: block;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Hilmar Regular';
+  src: url('/fonts/Hilmar-Regular.woff2') format('woff2');
+  font-display: block;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/PlusJakartaSans-Medium.woff2') format('woff2');
+  font-display: swap;
+  font-weight: 500;
+  font-style: normal;
+}
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Market Matrix Brand Colors - Light Theme */
+    --background: 250 100% 98%;
+    --foreground: 0 0% 15%;
+    --card: 250 100% 99%;
+    --card-foreground: 0 0% 15%;
+    --popover: 250 100% 99%;
+    --popover-foreground: 0 0% 15%;
+    --primary: 260 60% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 40% 95%;
+    --secondary-foreground: 0 0% 20%;
+    --muted: 250 40% 95%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 250 40% 90%;
+    --accent-foreground: 0 0% 30%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 250 40% 90%;
+    --input: 250 40% 90%;
+    --ring: 260 60% 65%;
     --radius: 0.5rem;
+
+    /* Custom Market Matrix Colors */
+    --mm-dark-bg: 250 100% 7%;
+    --mm-light-bg: 250 100% 98%;
+    --mm-accent-purple: 260 60% 75%;
+    --mm-accent-blue: 240 100% 50%;
+    --mm-text-primary: 0 0% 100%;
+    --mm-text-secondary: 0 0% 87%;
+    --mm-text-muted: 0 0% 61%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Market Matrix Brand Colors - Dark Theme */
+    --background: 250 100% 7%;
+    --foreground: 0 0% 85%;
+    --card: 250 100% 10%;
+    --card-foreground: 0 0% 85%;
+    --popover: 250 100% 10%;
+    --popover-foreground: 0 0% 85%;
+    --primary: 260 60% 75%;
+    --primary-foreground: 250 100% 7%;
+    --secondary: 250 40% 15%;
+    --secondary-foreground: 0 0% 87%;
+    --muted: 250 40% 15%;
+    --muted-foreground: 0 0% 61%;
+    --accent: 250 40% 20%;
+    --accent-foreground: 0 0% 93%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 250 40% 20%;
+    --input: 250 40% 20%;
+    --ring: 260 60% 75%;
+
+    /* Enhanced Dark Theme Colors */
+    --mm-dark-bg: 250 100% 7%;
+    --mm-light-bg: 250 100% 98%;
+    --mm-accent-purple: 260 60% 75%;
+    --mm-accent-blue: 240 100% 50%;
+    --mm-text-primary: 0 0% 100%;
+    --mm-text-secondary: 0 0% 87%;
+    --mm-text-muted: 0 0% 61%;
   }
 }
 
@@ -56,5 +109,24 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  /* Mobile-friendly tabs for analytics page */
+  .mobile-friendly-tabs {
+    @apply w-full;
+  }
+
+  @media (max-width: 640px) {
+    .mobile-friendly-tabs {
+      @apply grid-cols-1 gap-1;
+    }
+  }
+
+  @media (min-width: 641px) {
+    .mobile-friendly-tabs {
+      @apply grid-cols-3;
+    }
   }
 }

@@ -9,6 +9,13 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'display': ['"Enter The Grid Regular"', 'sans-serif'],
+        'heading': ['"Enter The Grid Regular"', 'sans-serif'],
+        'body': ['"Meutas Regular"', 'sans-serif'],
+        'paragraph': ['"Hilmar Regular"', 'sans-serif'],
+        'subheading': ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
