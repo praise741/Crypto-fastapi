@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { formatCurrency, formatPercentage, getChangeColor } from '@/lib/utils';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 interface TopPerformer {
   symbol: string;
@@ -67,6 +68,14 @@ interface ApiResponse<T> {
 }
 
 export default function AnalyticsPage() {
+  return (
+    <ProtectedRoute>
+      <AnalyticsContent />
+    </ProtectedRoute>
+  );
+}
+
+function AnalyticsContent() {
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [volatility, setVolatility] = useState<Volatility[]>([]);
   const [trends, setTrends] = useState<Trend[]>([]);
@@ -237,35 +246,35 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Market Analytics</h1>
-          <p className="text-muted-foreground mt-2">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Market Analytics</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             Advanced market insights and trend analysis
           </p>
         </div>
 
         {/* Market Indices */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-6 sm:mb-8">
           {indices.map((index) => (
             <Card key={index.index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{index.index}</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">{index.index}</CardTitle>
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="text-lg sm:text-2xl font-bold truncate">
                   {index.index.includes('Market Cap') ? `$${index.value.toFixed(2)}T` :
                    index.index.includes('Volume') ? `$${index.value.toFixed(1)}B` :
                    index.index.includes('Dominance') ? `${index.value.toFixed(1)}%` :
                    index.value.toFixed(0)}
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-xs font-medium ${getChangeColor(index.change_24h)}`}>
+                <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
+                  <span className={`text-[10px] sm:text-xs font-medium ${getChangeColor(index.change_24h)}`}>
                     {formatPercentage(index.change_24h)}
                   </span>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 py-0">
                     {index.classification}
                   </Badge>
                 </div>
@@ -434,7 +443,7 @@ export default function AnalyticsPage() {
               {trends.map((trend) => {
                 // Convert score to confidence percentage
                 const confidence = Math.min((trend.score || 0) * 20, 100); // Scale score to 0-100%
-                const signal = trend.trend === 'bullish' ? 'buy' : trend.trend === 'bearish' ? 'sell' : 'hold';
+                const signal = trend.trend === 'bullish' ? 'buy' : trend.trend === 'bearish' ? 'sell' : 'hold'; // handles 'sideways' and other values as 'hold'
 
                 return (
                 <Card key={trend.symbol || 'unknown'}>

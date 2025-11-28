@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { formatCurrency, formatPercentage, getChangeColor } from '@/lib/utils';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 interface Holding {
   symbol: string;
@@ -46,6 +47,14 @@ interface Allocation {
 }
 
 export default function PortfolioPage() {
+  return (
+    <ProtectedRoute>
+      <PortfolioContent />
+    </ProtectedRoute>
+  );
+}
+
+function PortfolioContent() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [performance, setPerformance] = useState<Performance | null>(null);
   const [allocation, setAllocation] = useState<Allocation[]>([]);
@@ -102,16 +111,16 @@ export default function PortfolioPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Portfolio Tracker</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Portfolio Tracker</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
               Track your holdings with detailed analytics and performance insights
             </p>
           </div>
-          <div>
+          <div className="flex-shrink-0">
             <input
               type="file"
               accept=".csv"
@@ -119,7 +128,7 @@ export default function PortfolioPage() {
               className="hidden"
               id="portfolio-upload"
             />
-            <Button asChild disabled={uploading}>
+            <Button asChild disabled={uploading} size="sm" className="w-full sm:w-auto">
               <label htmlFor="portfolio-upload" className="cursor-pointer">
                 {uploading ? (
                   <>
@@ -143,7 +152,7 @@ export default function PortfolioPage() {
           <>
             {/* Performance Summary */}
             {performance && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-6 sm:mb-8">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Value</CardTitle>

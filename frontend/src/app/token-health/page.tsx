@@ -9,13 +9,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 // Removed unused select imports
 import { Shield, Activity, AlertTriangle, CheckCircle, Search, RefreshCw, TrendingUp, Lock, DollarSign } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 
 interface TokenAnalytics {
   contract_address: string;
   symbol: string;
   name: string;
-  chain_id: string; // numeric as string for EVM or chain key for non‑EVM
+  chain_id: number | string; // numeric for EVM chains or string key for non‑EVM
   chain_name?: string; // friendly chain name when provided by backend
   price_usd: number | null;
   liquidity_usd: number | null;
@@ -61,6 +62,14 @@ interface TokenAnalyticsExtended extends TokenAnalytics {
 }
 
 export default function TokenHealthPage() {
+  return (
+    <ProtectedRoute>
+      <TokenHealthContent />
+    </ProtectedRoute>
+  );
+}
+
+function TokenHealthContent() {
   const [contractAddress, setContractAddress] = useState('');
   // Chain ID input removed; backend auto-detects
   const [tokenAnalytics, setTokenAnalytics] = useState<TokenAnalytics | null>(null);
@@ -216,26 +225,26 @@ export default function TokenHealthPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Shield className="h-8 w-8 text-primary" />
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-primary flex-shrink-0" />
             Token Health Checker
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             Analyze cryptocurrency tokens for safety, liquidity, and potential risks
           </p>
         </div>
 
         {/* Search Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+        <Card className="mb-6 sm:mb-8">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               Contract Address Analysis
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Analyze cryptocurrency tokens by contract address for comprehensive security and liquidity insights
             </CardDescription>
           </CardHeader>

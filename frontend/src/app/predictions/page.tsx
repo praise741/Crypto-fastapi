@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { formatCurrency, formatPercentage, getChangeColor } from '@/lib/utils';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 interface Prediction {
   symbol: string;
@@ -104,6 +105,14 @@ interface Signal {
 const POPULAR_SYMBOLS = ['BTC', 'ETH', 'SOL', 'BNB', 'ADA', 'XRP', 'DOT', 'MATIC'];
 
 export default function PredictionsPage() {
+  return (
+    <ProtectedRoute>
+      <PredictionsContent />
+    </ProtectedRoute>
+  );
+}
+
+function PredictionsContent() {
   const [symbol, setSymbol] = useState('BTC');
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
@@ -183,9 +192,11 @@ export default function PredictionsPage() {
         include_factors: true
       });
 
-      if ((response as unknown as ApiResponse).success && (response as unknown as ApiResponse).data) {
+      const apiResponse = response as unknown as ApiResponse & { error?: { message?: string; code?: string } };
+      
+      if (apiResponse.success && apiResponse.data) {
           // Check if we have prediction data with probability info
-          const responseData = (response as unknown as ApiResponse).data!;
+          const responseData = apiResponse.data;
           if (responseData?.predictions &&
               responseData.predictions.length > 0 &&
               responseData.predictions[0]?.probability) {
@@ -213,7 +224,9 @@ export default function PredictionsPage() {
           setError('No valid prediction data available for this token');
         }
       } else {
-        setError('No predictions available for this symbol');
+        // Display backend error message if available
+        const errorMessage = apiResponse.error?.message || 'No predictions available for this symbol';
+        setError(errorMessage);
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: { message?: string } } } };
@@ -260,28 +273,29 @@ export default function PredictionsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">AI-Powered Predictions & Token Health</h1>
-          <p className="text-muted-foreground mt-2">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">AI-Powered Predictions & Token Health</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             Know the right time to buy or sell with AI-powered predictions
           </p>
         </div>
 
         {/* Popular Symbols */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Popular Cryptocurrencies</CardTitle>
-            <CardDescription>Click on any cryptocurrency to view AI-powered predictions</CardDescription>
+        <Card className="mb-6 sm:mb-8">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Popular Cryptocurrencies</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Click on any cryptocurrency to view AI-powered predictions</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+            <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-2">
               {POPULAR_SYMBOLS.map((sym) => (
                 <Button
                   key={sym}
                   variant={symbol === sym ? 'default' : 'outline'}
                   size="sm"
+                  className="text-xs sm:text-sm px-2 sm:px-3"
                   onClick={() => {
                     setSymbol(sym);
                     loadPrediction(sym);
@@ -291,7 +305,7 @@ export default function PredictionsPage() {
                 </Button>
               ))}
             </div>
-            {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+            {error && <p className="text-xs sm:text-sm text-destructive mt-2 break-words">{error}</p>}
           </CardContent>
         </Card>
 
@@ -530,22 +544,26 @@ function PredictionDetails({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {prediction.factors?.map((factor, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <span className="text-sm capitalize">{factor.name.replace(/_/g, ' ')}</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${factor.impact * 100}%` }}
-                    />
+            {prediction.factors && prediction.factors.length > 0 ? (
+              prediction.factors.map((factor, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-sm capitalize">{factor.name.replace(/_/g, ' ')}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary rounded-full"
+                        style={{ width: `${factor.impact * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium w-12 text-right">
+                      {(factor.impact * 100).toFixed(0)}%
+                    </span>
                   </div>
-                  <span className="text-sm font-medium w-12 text-right">
-                    {(factor.impact * 100).toFixed(0)}%
-                  </span>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">Factor analysis not available for this prediction</p>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Activity, DollarSign, AlertTriangle } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { formatCurrency, formatPercentage, getChangeColor, formatDate } from '@/lib/utils';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 
 interface MarketData {
   symbol: string;
@@ -48,6 +49,14 @@ interface PricesResponse {
 }
 
 export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  );
+}
+
+function DashboardContent() {
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -108,64 +117,64 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             Real-time market overview and AI-powered predictions
           </p>
         </div>
 
         {/* Metrics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-6 sm:mb-8">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Market Cap</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">Total Market Cap</CardTitle>
+              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.total_market_cap ? formatCurrency(metrics.total_market_cap, 0) : '📊 Loading...'}
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold truncate">
+                {metrics?.total_market_cap ? formatCurrency(metrics.total_market_cap, 0) : 'Loading...'}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">24h Volume</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">24h Volume</CardTitle>
+              <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.total_volume_24h ? formatCurrency(metrics.total_volume_24h, 0) : '📊 Loading...'}
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold truncate">
+                {metrics?.total_volume_24h ? formatCurrency(metrics.total_volume_24h, 0) : 'Loading...'}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">BTC Dominance</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">BTC Dominance</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.btc_dominance ? `${metrics.btc_dominance.toFixed(2)}%` : '📊 Loading...'}
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold">
+                {metrics?.btc_dominance ? `${metrics.btc_dominance.toFixed(2)}%` : 'Loading...'}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Fear & Greed</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">Fear & Greed</CardTitle>
+              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {metrics?.fear_greed_index || '📊 Loading...'}
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-lg sm:text-2xl font-bold">
+                {metrics?.fear_greed_index || 'Loading...'}
               </div>
               {metrics?.fear_greed_index && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                   {metrics.fear_greed_index > 75 ? 'Extreme Greed' :
                    metrics.fear_greed_index > 55 ? 'Greed' :
                    metrics.fear_greed_index > 45 ? 'Neutral' :
@@ -177,7 +186,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Content */}
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
           {/* Market Overview */}
           <div className="lg:col-span-2">
             <Card>

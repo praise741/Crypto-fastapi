@@ -99,6 +99,10 @@ class ApiClient {
     return this.client.get('/market/prices');
   }
 
+  async getTrending() {
+    return this.client.get('/market/trending');
+  }
+
   async getSymbolPrice(symbol: string) {
     return this.client.get(`/market/${symbol}/price`);
   }
