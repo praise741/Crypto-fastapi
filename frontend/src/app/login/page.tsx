@@ -38,7 +38,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-xl sm:text-2xl font-bold">Connect Wallet</CardTitle>
           <CardDescription className="text-sm">
-            Connect your Web3 wallet to access the Market Matrix dashboard
+            Connect your Solana wallet to access the Market Matrix dashboard
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-0">
@@ -53,7 +53,7 @@ export default function LoginPage() {
             
             <div className="bg-muted/50 p-3 sm:p-4 rounded-lg text-xs sm:text-sm text-muted-foreground text-center">
               <p>Access is restricted to token holders.</p>
-              <p className="mt-1">Please connect your MetaMask or compatible wallet to verify ownership.</p>
+              <p className="mt-1">Connect with Phantom, Solflare, or any Solana wallet to verify ownership.</p>
             </div>
 
             <Button 
@@ -61,7 +61,7 @@ export default function LoginPage() {
               onClick={handleConnect}
               disabled={loading}
             >
-              {loading ? 'Connecting...' : 'Connect Wallet'}
+              {loading ? 'Connecting...' : 'Connect Solana Wallet'}
             </Button>
           </div>
         </CardContent>

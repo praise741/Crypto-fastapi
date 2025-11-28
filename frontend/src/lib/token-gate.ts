@@ -1,81 +1,100 @@
 /**
- * Token Gating Utilities
+ * Token Gating Utilities for Solana SPL Tokens
  * 
- * This module provides multiple methods for token gating:
- * 1. Client-side (current) - Uses wallet extension directly
- * 2. Backend-verified - Calls your backend API to verify
- * 3. Signature-based - User signs a message to prove ownership
+ * This module provides token gating for Solana/pump.fun tokens:
+ * 1. Client-side check via Solana RPC
+ * 2. Backend-verified check for extra security
  */
 
-// Token gate configuration
+// Token gate configuration for Solana
 export const TOKEN_CONFIG = {
+  // SPL Token mint address (from pump.fun or any Solana token)
   address: process.env.NEXT_PUBLIC_TOKEN_GATE_ADDRESS || '',
+  // Minimum balance required (in smallest units - for 6 decimals: 500000 = 0.5 tokens)
   minBalance: process.env.NEXT_PUBLIC_MIN_TOKEN_BALANCE || '1',
-  chainId: process.env.NEXT_PUBLIC_TOKEN_CHAIN_ID || '1', // Default: Ethereum mainnet
-  // Chain IDs: 1=Ethereum, 56=BSC, 137=Polygon, 8453=Base, 42161=Arbitrum, 10=Optimism
+  // Solana RPC endpoint
+  rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
 };
 
-// ERC-20 ABI for balanceOf
-const ERC20_BALANCE_OF_SELECTOR = '0x70a08231';
-
 /**
- * Method 1: Client-side token check (requires wallet extension)
- * Pros: No backend needed, real-time
- * Cons: Requires extension, can be bypassed
+ * Check SPL token balance using Solana RPC
+ * Works with pump.fun tokens and any SPL token
  */
-export async function checkTokenBalanceClient(
+export async function checkSolanaTokenBalance(
   walletAddress: string
 ): Promise<{ hasTokens: boolean; balance: string }> {
-  if (!TOKEN_CONFIG.address || !window.ethereum) {
+  if (!TOKEN_CONFIG.address) {
     return { hasTokens: true, balance: 'N/A' }; // No gating configured
   }
 
   try {
-    const paddedAddress = walletAddress.slice(2).padStart(64, '0');
-    const data = ERC20_BALANCE_OF_SELECTOR + paddedAddress;
+    // Use Solana RPC to get token accounts
+    const response = await fetch(TOKEN_CONFIG.rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getTokenAccountsByOwner',
+        params: [
+          walletAddress,
+          { mint: TOKEN_CONFIG.address },
+          { encoding: 'jsonParsed' }
+        ]
+      })
+    });
 
-    const balance = await window.ethereum.request({
-      method: 'eth_call',
-      params: [{ to: TOKEN_CONFIG.address, data }, 'latest'],
-    }) as string;
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error('Solana RPC error:', data.error);
+      return { hasTokens: false, balance: '0' };
+    }
 
-    const balanceBigInt = BigInt(balance);
+    // Check if user has any token accounts for this mint
+    const accounts = data.result?.value || [];
+    
+    if (accounts.length === 0) {
+      return { hasTokens: false, balance: '0' };
+    }
+
+    // Sum up balance from all token accounts
+    let totalBalance = BigInt(0);
+    for (const account of accounts) {
+      const amount = account.account?.data?.parsed?.info?.tokenAmount?.amount || '0';
+      totalBalance += BigInt(amount);
+    }
+
     const minBalanceBigInt = BigInt(TOKEN_CONFIG.minBalance);
+    const hasTokens = totalBalance >= minBalanceBigInt;
 
     return {
-      hasTokens: balanceBigInt >= minBalanceBigInt,
-      balance: balanceBigInt.toString(),
+      hasTokens,
+      balance: totalBalance.toString(),
     };
   } catch (error) {
-    console.error('Client token check failed:', error);
+    console.error('Solana token check failed:', error);
     return { hasTokens: false, balance: '0' };
   }
 }
 
 /**
- * Method 2: Backend-verified token check (more secure)
- * Pros: Can't be bypassed, works without wallet extension for viewing
- * Cons: Requires backend endpoint, slight delay
- * 
- * Your backend should call an RPC provider (Alchemy, Infura, etc.)
- * to verify the token balance server-side.
+ * Backend-verified Solana token check (more secure)
+ * Your backend should verify using Solana RPC
  */
-export async function checkTokenBalanceBackend(
-  walletAddress: string,
-  signature?: string // Optional: signed message to prove ownership
+export async function checkSolanaTokenBalanceBackend(
+  walletAddress: string
 ): Promise<{ hasTokens: boolean; balance: string; verified: boolean }> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     
-    const response = await fetch(`${apiUrl}/api/v1/auth/verify-token-holder`, {
+    const response = await fetch(`${apiUrl}/api/v1/auth/verify-solana-token-holder`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         wallet_address: walletAddress,
-        token_address: TOKEN_CONFIG.address,
+        token_mint: TOKEN_CONFIG.address,
         min_balance: TOKEN_CONFIG.minBalance,
-        chain_id: TOKEN_CONFIG.chainId,
-        signature, // Optional signature for extra verification
       }),
     });
 
@@ -90,66 +109,42 @@ export async function checkTokenBalanceBackend(
       verified: data.verified || false,
     };
   } catch (error) {
-    console.error('Backend token check failed:', error);
+    console.error('Backend Solana token check failed:', error);
     // Fallback to client-side check
-    const clientResult = await checkTokenBalanceClient(walletAddress);
+    const clientResult = await checkSolanaTokenBalance(walletAddress);
     return { ...clientResult, verified: false };
   }
-}
-
-/**
- * Method 3: Signature-based verification
- * User signs a message to prove they own the wallet
- * Combined with backend check for maximum security
- */
-export async function signAndVerify(
-  walletAddress: string
-): Promise<{ signature: string; message: string } | null> {
-  if (!window.ethereum) {
-    return null;
-  }
-
-  try {
-    const timestamp = Date.now();
-    const message = `Verify token ownership for Market Matrix\n\nWallet: ${walletAddress}\nTimestamp: ${timestamp}`;
-
-    const signature = await window.ethereum.request({
-      method: 'personal_sign',
-      params: [message, walletAddress],
-    }) as string;
-
-    return { signature, message };
-  } catch (error) {
-    console.error('Signature failed:', error);
-    return null;
-  }
-}
-
-/**
- * Combined verification: Best of both worlds
- * 1. User signs message (proves wallet ownership)
- * 2. Backend verifies signature + checks token balance via RPC
- */
-export async function verifyTokenHolderSecure(
-  walletAddress: string
-): Promise<{ hasTokens: boolean; verified: boolean }> {
-  // Step 1: Get signature
-  const signResult = await signAndVerify(walletAddress);
-  if (!signResult) {
-    return { hasTokens: false, verified: false };
-  }
-
-  // Step 2: Send to backend for verification
-  const result = await checkTokenBalanceBackend(walletAddress, signResult.signature);
-  return {
-    hasTokens: result.hasTokens,
-    verified: result.verified,
-  };
 }
 
 /**
  * Check if token gating is enabled
  */
 export function isTokenGatingEnabled(): boolean {
-  return !!TOKEN_CONFIG.address && TOKEN_CONFIG.address !== '0x0000000000000000000000000000000000000000';
+  return !!TOKEN_CONFIG.address && 
+         TOKEN_CONFIG.address.length > 30 && // Solana addresses are ~44 chars
+         TOKEN_CONFIG.address !== '0x0000000000000000000000000000000000000000';
+}
+
+/**
+ * Format token balance for display
+ * pump.fun tokens typically have 6 decimals
+ */
+export function formatTokenBalance(balance: string, decimals: number = 6): string {
+  if (balance === 'N/A') return balance;
+  
+  try {
+    const balanceBigInt = BigInt(balance);
+    const divisor = BigInt(10 ** decimals);
+    const wholePart = balanceBigInt / divisor;
+    const fractionalPart = balanceBigInt % divisor;
+    
+    if (fractionalPart === BigInt(0)) {
+      return wholePart.toString();
+    }
+    
+    const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+    return `${wholePart}.${fractionalStr.replace(/0+$/, '')}`;
+  } catch {
+    return balance;
+  }
 }

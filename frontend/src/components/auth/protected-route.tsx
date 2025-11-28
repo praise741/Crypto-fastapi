@@ -47,7 +47,7 @@ export function ProtectedRoute({ children, requireTokenHolder = true }: Protecte
             </div>
             <CardTitle className="text-xl sm:text-2xl font-bold">Token Required</CardTitle>
             <CardDescription className="text-sm">
-              This feature requires you to hold Market Matrix tokens
+              This feature requires you to hold the project token
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">

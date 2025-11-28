@@ -2,8 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { checkTokenBalanceBackend, checkTokenBalanceClient, isTokenGatingEnabled } from '@/lib/token-gate';
-// Window type definition is in src/types/window.d.ts (auto-included by TypeScript)
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { checkSolanaTokenBalance, isTokenGatingEnabled } from '@/lib/token-gate';
 
 interface AuthContextType {
   walletAddress: string | null;
@@ -11,6 +12,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isTokenHolder: boolean;
   tokenBalance: string | null;
+  walletType: 'solana' | 'evm' | null;
   connectWallet: () => Promise<void>;
   logout: () => void;
   checkTokenBalance: () => Promise<boolean>;
@@ -19,13 +21,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isTokenHolder, setIsTokenHolder] = useState(false);
   const [tokenBalance, setTokenBalance] = useState<string | null>(null);
   const router = useRouter();
+  
+  // Solana wallet adapter hooks
+  const { publicKey, connected, disconnect, connecting } = useWallet();
+  const { setVisible } = useWalletModal();
+  
+  // Derive wallet address from Solana wallet
+  const walletAddress = publicKey?.toBase58() || null;
+  const walletType = connected ? 'solana' : null;
 
-  // Check if user holds the required token
+  // Check if user holds the required SPL token
   const checkTokenBalance = useCallback(async (): Promise<boolean> => {
     if (!walletAddress) {
       setIsTokenHolder(false);
@@ -41,27 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Try backend verification first (more secure, doesn't require wallet extension for check)
-      const result = await checkTokenBalanceBackend(walletAddress);
-      if (result.verified) {
-        setIsTokenHolder(result.hasTokens);
-        setTokenBalance(result.balance);
-        return result.hasTokens;
-      }
-      
-      // Fallback to client-side if backend verification failed
-      if (window.ethereum) {
-        const clientResult = await checkTokenBalanceClient(walletAddress);
-        setIsTokenHolder(clientResult.hasTokens);
-        setTokenBalance(clientResult.balance);
-        return clientResult.hasTokens;
-      }
-      
-      // No verification method available
-      console.warn('No verification method available');
-      setIsTokenHolder(false);
-      setTokenBalance(null);
-      return false;
+      const result = await checkSolanaTokenBalance(walletAddress);
+      setIsTokenHolder(result.hasTokens);
+      setTokenBalance(result.balance);
+      return result.hasTokens;
     } catch (error) {
       console.error('Failed to check token balance:', error);
       setIsTokenHolder(false);
@@ -70,90 +62,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [walletAddress]);
 
+  // Handle initial loading state
   useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        // Check if previously connected
-        const storedAddress = localStorage.getItem('wallet_address');
-        
-        if (storedAddress && window.ethereum) {
-            // Verify if we still have access
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
-            if (accounts.length > 0 && accounts[0].toLowerCase() === storedAddress.toLowerCase()) {
-                setWalletAddress(accounts[0]);
-            } else {
-                // Disconnected or changed account
-                localStorage.removeItem('wallet_address');
-                setWalletAddress(null);
-            }
-        }
-      } catch (error) {
-        console.error("Failed to check wallet connection", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkConnection();
+    // Give wallet adapter time to auto-connect
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
     
-    // Listen for account changes
-    if (window.ethereum) {
-        const handleAccountsChanged = (params: unknown) => {
-            const accounts = params as string[];
-            if (accounts.length > 0) {
-                setWalletAddress(accounts[0]);
-                localStorage.setItem('wallet_address', accounts[0]);
-            } else {
-                setWalletAddress(null);
-                localStorage.removeItem('wallet_address');
-                router.push('/login');
-            }
-        };
-        
-        window.ethereum.on('accountsChanged', handleAccountsChanged);
-        
-        return () => {
-             if (window.ethereum?.removeListener) {
-                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-             }
-        };
-    }
-  }, [router]);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Check token balance when wallet address changes
+  // Update loading state when connecting
   useEffect(() => {
-    if (walletAddress) {
+    if (connecting) {
+      setIsLoading(true);
+    } else {
+      setIsLoading(false);
+    }
+  }, [connecting]);
+
+  // Check token balance when wallet connects
+  useEffect(() => {
+    if (walletAddress && connected) {
       checkTokenBalance();
     } else {
       setIsTokenHolder(false);
       setTokenBalance(null);
     }
-  }, [walletAddress, checkTokenBalance]);
+  }, [walletAddress, connected, checkTokenBalance]);
 
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      alert("Please install MetaMask or another Web3 wallet!");
-      return;
-    }
-
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
-      if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        localStorage.setItem('wallet_address', accounts[0]);
+  // Redirect to dashboard after successful connection
+  useEffect(() => {
+    if (connected && walletAddress && !isLoading) {
+      const currentPath = window.location.pathname;
+      if (currentPath === '/login') {
         router.push('/dashboard');
       }
-    } catch (error) {
-      console.error("User denied wallet connection", error);
-      throw error;
     }
+  }, [connected, walletAddress, isLoading, router]);
+
+  const connectWallet = async () => {
+    // Open Solana wallet modal (Phantom, Solflare, etc.)
+    setVisible(true);
   };
 
-  const logout = () => {
-    setWalletAddress(null);
+  const logout = async () => {
+    try {
+      await disconnect();
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+    }
     setIsTokenHolder(false);
     setTokenBalance(null);
-    localStorage.removeItem('wallet_address');
     router.push('/login');
   };
 
@@ -162,9 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         walletAddress,
         isLoading,
-        isAuthenticated: !!walletAddress,
+        isAuthenticated: connected && !!walletAddress,
         isTokenHolder,
         tokenBalance,
+        walletType,
         connectWallet,
         logout,
         checkTokenBalance,
